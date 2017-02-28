@@ -1,6 +1,19 @@
-import { pull, emptyObject, keys, cloneDeep, assign, arrayHead } from './util.js';
-class Marbles {
-  constructor(routingGraph) {
+import {
+  pull,
+  isString,
+  isFunction,
+  emptyObject,
+  noop,
+  keys,
+  cloneDeep,
+  assign,
+  arrayHead,
+  isObject,
+  peek
+} from './util.js';
+
+export default class Marbles {
+  constructor(routingGraph, win = window) {
     const IMMUTABLE_GRAPH = routingGraph;
     const DYNAMIC_SEGMENT_REGEX = /:[a-zA-Z]+(?=\/?)/;
     const DIGIT_SEGMENT_REGEX = /\d+(?=\/?)/;
@@ -8,35 +21,38 @@ class Marbles {
       obj[key] = [];
       return obj;
     }, emptyObject());
-    let mutableGraph;
-    let linkedList;
+    const graphStack = [];
 
     // Private methods
     function expandSegment(segment, data) {
       return segment.replace(
         DYNAMIC_SEGMENT_REGEX,
-        (segmentKey) => data[segmentKey.replace(':', '')]
+        segmentKey => data[segmentKey.replace(':', '')]
       );
     }
 
     function extractSegmentData(templateSegment, segmentWithData) {
-      const dynamicSegments = templateSegment.match(new RegExp(DYNAMIC_SEGMENT_REGEX, 'g')) || [];
+      const dynamicSegments = templateSegment.match(
+        new RegExp(DYNAMIC_SEGMENT_REGEX.source, 'g')
+      ) || [];
       return (segmentWithData.match(DIGIT_SEGMENT_REGEX) || []).reduce((data, value, index) => {
         data[dynamicSegments[index].replace(':', '')] = value;
         return assign(emptyObject(), data);
-      }, emptyObject());
+      },
+        emptyObject()
+      );
     }
 
     function segmentToRegex(segment) {
       // It just got weird
       const regexed = segment.replace(
-        new RegExp(DYNAMIC_SEGMENT_REGEX, 'g'),
+        new RegExp(DYNAMIC_SEGMENT_REGEX.source, 'g'),
         DIGIT_SEGMENT_REGEX.source
       );
       return new RegExp(regexed);
     }
 
-    function findListNode(list, nodeId) {
+    function findListNode(nodeId, list) {
       let next = list;
       while (next) {
         if (next.id === nodeId) {
@@ -62,21 +78,27 @@ class Marbles {
       return assign(emptyObject(), graphNode, {
         id,
         segment: expandSegment(graphNode.segment, graphNode.data),
-        next: null
+        next: null,
       });
     }
 
-    function deactivateGraphNode(nodeId, graph) {
-      const node = graph[nodeId];
-      node.active = false;
-      node.data = emptyObject();
-      node.children.forEach((childId) => deactivateGraphNode(childId, graph));
+    function deactivateGraphNode(force, nodeId, immutableGraph) {
+      const graph = cloneDeep(immutableGraph);
+      function recDeactivate(target, current, g) {
+        const curr = g[current];
+        if (target === current || curr.dependency === target || force) {
+          curr.active = false;
+          curr.data = emptyObject();
+        }
+        curr.children.forEach(childId => recDeactivate(target, childId, g));
+      }
+      recDeactivate(nodeId, nodeId, graph);
+      return graph;
     }
 
-    function activateGraphNode(nodeId, data, graph) {
-      const parents = keys(graph).filter(
-        (key) => graph[key].children.indexOf(nodeId) !== -1
-      );
+    function activateGraphNode(nodeId, data, immutableGraph) {
+      const graph = cloneDeep(immutableGraph);
+      const parents = keys(graph).filter(key => graph[key].children.indexOf(nodeId) !== -1);
       function dfsActivate(searchId, currentId, dependencyMet) {
         const curr = graph[currentId];
         const search = graph[searchId];
@@ -88,19 +110,22 @@ class Marbles {
         else if (currentId === searchId && !dependencyMet) {
           return false;
         }
-        return curr.children.reduce((depMet, childId) => {
-          return dfsActivate(searchId, childId, depMet);
-        }, dependencyMet || currentId === search.dependency);
+        return curr.children.reduce(
+          (depMet, childId) => dfsActivate(searchId, childId, depMet),
+          dependencyMet || currentId === search.dependency
+        );
       }
+
       const activated = dfsActivate(nodeId, 'root', false);
-      if (!activated) {
-        return;
+      if (activated) {
+        // deactivate immediate siblings
+        return parents.reduce((g, parentId) => {
+          return g[parentId].children.filter(id => id !== nodeId).reduce((retG, childId) => {
+            return deactivateGraphNode(true, childId, retG);
+          }, g);
+        }, graph);
       }
-      parents.forEach((parentId) => {
-        graph[parentId].children.filter((id) => id !== nodeId).forEach((childId) => {
-          deactivateGraphNode(childId, graph);
-        });
-      });
+      return graph;
     }
 
     function appendNode(node, head) {
@@ -119,28 +144,43 @@ class Marbles {
       return clonedHead;
     }
 
-    function parseHash(hash, graph, rootId, visitedNodes) {
-      const root = graph[rootId];
-      root.children.forEach((childId) => {
-        const child = graph[childId];
-        const matches = hash.match(segmentToRegex(child.segment)) || [];
-        const substrIndex = matches.index ? matches.index + matches[0].length : 0;
-        if (visitedNodes[childId]) {
-          return;
-        }
-        visitedNodes[childId] = true;
-        if (matches.length > 0 && (graph[child.dependency] || emptyObject()).active) {
-          activateGraphNode(childId, extractSegmentData(child.segment, arrayHead(matches)), graph);
-        }
-        parseHash(hash.substr(substrIndex), graph, childId, visitedNodes);
-      });
+    function parseHash(hashRoute, routeGraph) {
+      function recParse(hash, rootId, visitedNodes, graph) {
+        const root = graph[rootId];
+        return root.children.reduce((g, childId) => {
+          const child = graph[childId];
+          let newG = g;
+          const matches = hash.match(segmentToRegex(child.segment)) || [];
+          const substrIndex = matches.index ? matches.index + matches[0].length : 0;
+          if (visitedNodes[childId]) {
+            return newG;
+          }
+          visitedNodes[childId] = true;
+          if (matches.length > 0 && (graph[child.dependency] || emptyObject()).active) {
+            newG = activateGraphNode(
+              childId,
+              extractSegmentData(child.segment, arrayHead(matches)),
+              graph
+            );
+          }
+          return recParse(hash.substr(substrIndex), childId, visitedNodes, newG);
+        }, graph);
+      }
+      const newGraph = cloneDeep(routeGraph);
+      return recParse(hashRoute, 'root', {}, newGraph);
+    }
+
+    function buildGraph(hash) {
+      return parseHash(hash, IMMUTABLE_GRAPH);
     }
 
     function listToHashRoute(head) {
       let str = '#';
       let next = head;
       while (next) {
-        str += `${next.segment}/`;
+        if (next.segment) {
+          str += `${next.segment}/`;
+        }
         next = next.next;
       }
       return str;
@@ -151,65 +191,132 @@ class Marbles {
       const nextListNode = graphNodeToListNode(rootId, graph);
       const newHead = root.active ? appendNode(nextListNode, listHead) : cloneDeep(listHead);
 
-      return root.children.reduce((head, childId) => {
-        if (visitedNodes[childId]) {
-          return head;
-        }
-        visitedNodes[childId] = true;
-        return graphToLinkedList(graph, childId, head, visitedNodes);
-      }, newHead);
+      return root.children.reduce(
+        (head, childId) => {
+          if (visitedNodes[childId]) {
+            return head;
+          }
+          visitedNodes[childId] = true;
+          return graphToLinkedList(graph, childId, head, visitedNodes);
+        },
+        newHead
+      );
+    }
+
+    function logGraph(newGraph) {
+      const lastGraph = peek(graphStack);
+      if (!lastGraph || JSON.stringify(lastGraph) !== JSON.stringify(newGraph)) {
+        graphStack.push(newGraph);
+      }
+      return newGraph;
     }
 
     function graphToList(graph) {
+      if (!graph) {
+        return null;
+      }
       return graphToLinkedList(graph, 'root', graphNodeToListNode('root', graph), emptyObject());
     }
 
-    function notifyObservers(obs, listHead) {
-      let next = listHead;
+    function notifyObservers(obsObj, oldGraph, newGraph) {
+      const oldListHead = graphToList(oldGraph);
+      const newListHead = graphToList(newGraph);
+      const missing = (() => {
+        let nxt = oldListHead;
+        const arr = [];
+        while (nxt) {
+          if (!findListNode(nxt.id, newListHead)) {
+            arr.push(nxt.id);
+          }
+          nxt = nxt.next;
+        }
+        return arr;
+      })();
+      missing.forEach((routeId) => {
+        obsObj[routeId].forEach((obs) => {
+          obs.removed();
+        });
+      });
+      let next = newListHead;
       while (next) {
-        const handlers = obs[next.id];
-        for (let i = 0; i < handlers.length; i++) {
-          handlers[i](chainData(listHead, next));
+        const observerArray = obsObj[next.id];
+        for (let i = 0; i < observerArray.length; i++) {
+          observerArray[i].inserted(chainData(newListHead, next));
         }
         next = next.next;
       }
     }
+
+    function insertOrRemove(insert, routeId, data) {
+      let dataToUse = data;
+      if (!isString(routeId) || !IMMUTABLE_GRAPH[routeId]) {
+        return null;
+      }
+      if (data === null || typeof data !== 'object' || data instanceof Array) {
+        dataToUse = emptyObject();
+      }
+      const graph = buildGraph(win.location.hash);
+      let newGraph;
+      if (insert) {
+        newGraph = activateGraphNode(routeId, dataToUse, graph);
+      }
+      else {
+        newGraph = deactivateGraphNode(false, routeId, graph);
+      }
+      win.location.hash = listToHashRoute(graphToList(newGraph));
+      return this;
+    }
     // End private methods
 
     // Public methods
-    this.subscribe = function subscribe(routeId, handler) {
-      const observer = {
-        routeId,
-        handler
-      };
-      observers[routeId].push(observer.handler);
-      return observer;
-    };
-    this.unsubscribe = function unsubscribe(observer) {
-      return pull(observers[observer.routeId], observer.handler);
-    };
-    this.publish = function publish(routeId, data) {
-      activateGraphNode(routeId, data, mutableGraph);
-      linkedList = graphToList(mutableGraph);
-      // TODO: make this async
-      observers[routeId].forEach((handler) => {
-        handler(chainData(linkedList, findListNode(linkedList, routeId)));
+    this.subscribe = function subscribe(subscriptions) {
+      if (!isObject(subscriptions)) {
+        return false;
+      }
+      const matchingKeys = keys(subscriptions).filter(key => !!observers[key]);
+      if (matchingKeys.length === 0) {
+        return false;
+      }
+      matchingKeys.forEach(key => {
+        const sub = subscriptions[key];
+        observers[key].push({
+          inserted: sub.inserted || noop,
+          removed: sub.removed || noop,
+        });
       });
-      window.location.hash = listToHashRoute(linkedList);
+      return true;
     };
-    this.trigger = function trigger() {
-      const originalHash = window.location.hash;
-      mutableGraph = cloneDeep(IMMUTABLE_GRAPH);
-      parseHash(originalHash, mutableGraph, 'root', emptyObject());
-      linkedList = graphToList(mutableGraph);
-      const newHash = listToHashRoute(linkedList);
-      history.replaceState(emptyObject(), '', newHash);
-      notifyObservers(observers, linkedList);
+    this.unsubscribe = function unsubscribe(route, event, handler) {
+      if (!isString(route) || !isString(event) || !isFunction(handler) || !observers[route]) {
+        return false;
+      }
+      const matchingObservers = observers[route].filter((obs) => obs[event] === handler);
+      return pull(matchingObservers, observers[route]);
+    };
+    this.insert = function insert(routeId, data) {
+      return insertOrRemove.call(this, true, routeId, data);
+    };
+    this.remove = function remove(routeId) {
+      return insertOrRemove.call(this, false, routeId);
+    };
+    this.step = function step() {
+      const originalHash = win.location.hash;
+      const graph = buildGraph(originalHash);
+      notifyObservers(observers, graphStack.pop(), graph);
+      logGraph(graph);
+      win.history.replaceState(emptyObject(), '', listToHashRoute(graphToList(graph)));
+      return this;
+    };
+
+    const listener = this.step.bind(this);
+    this.start = function start() {
+      win.addEventListener('hashchange', listener);
+      return this;
+    };
+    this.stop = function stop() {
+      win.removeEventListener('hashchange', listener);
+      return this;
     };
     // End public methods
-
-    window.addEventListener('hashchange', this.trigger.bind(this));
   }
 }
-
-export default Marbles;
