@@ -1,7 +1,7 @@
 const join = require('path').join;
 
 module.exports = {
-  entry: './src/index.js',
+  entry: './src/marbles.js',
   output: {
     path: join(__dirname, 'dist'),
     libraryTarget: 'umd',

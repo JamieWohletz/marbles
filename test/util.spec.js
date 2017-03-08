@@ -1,7 +1,64 @@
 /* eslint-env mocha */
 import { assert } from 'chai';
-import { emptyObject, keys, cloneDeep, assign, arrayHead, pull, without } from '../src/util.js';
+import {
+  pull,
+  isString,
+  isFunction,
+  emptyObject,
+  noop,
+  keys,
+  cloneDeep,
+  assign,
+  arrayHead,
+  isObject,
+  without
+} from '../src/util.js';
 describe('util', () => {
+  describe('noop()', () => {
+    it('should do nothing', () => {
+      const mutableObj = { foo: 'bar' };
+      const mutableArr = [1, 2, 3];
+      assert.isUndefined(noop());
+      assert.isUndefined(noop(325));
+      assert.isUndefined(noop('12asdf34'));
+      assert.isUndefined(noop(mutableObj));
+      assert.deepEqual(mutableObj, { foo: 'bar' });
+      assert.isUndefined(noop(mutableArr));
+      assert.deepEqual(mutableArr, [1, 2, 3]);
+    });
+  });
+  describe('isString()', () => {
+    it('should ensure the given value is a string', () => {
+      assert.ok(isString('asdf'));
+      assert.notOk(isString({}));
+      assert.notOk(isString(32512));
+      assert.notOk(isString([]));
+      assert.notOk(isString(null));
+      assert.notOk(isString());
+    });
+  });
+  describe('isFunction()', () => {
+    it('should ensure the given value is a function', () => {
+      assert.ok(isFunction(() => {}));
+      assert.notOk(isFunction({}));
+      assert.notOk(isFunction(32512));
+      assert.notOk(isFunction([]));
+      assert.notOk(isFunction(null));
+      assert.notOk(isFunction());
+      assert.notOk(isFunction('string'));
+    });
+  });
+  describe('isObject()', () => {
+    it('should ensure the given value is an object', () => {
+      assert.ok(isObject(Object.create(null)));
+      assert.ok(isObject({}));
+      assert.notOk(isObject('string'));
+      assert.notOk(isObject(32512));
+      assert.notOk(isObject([]));
+      assert.notOk(isObject(null));
+      assert.notOk(isObject());
+    });
+  });
   describe('emptyObject()', () => {
     it('should create an empty object with no prototype', () => {
       const obj = emptyObject();

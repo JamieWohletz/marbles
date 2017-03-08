@@ -2,6 +2,18 @@ function emptyObject() {
   return Object.create(null);
 }
 
+function isObject(any) {
+  return typeof any === 'object' && any !== null && !(any instanceof Array);
+}
+
+function isString(any) {
+  return typeof any === 'string';
+}
+
+function isFunction(any) {
+  return typeof any === 'function';
+}
+
 function keys(obj) {
   return Object.keys(obj);
 }
@@ -46,9 +58,23 @@ function without(values, array) {
   return newArray;
 }
 
-export default {
+function peek(arr) {
+  if (!arr || !(arr instanceof Array)) {
+    return null;
+  }
+  return arr[arr.length-1] || null;
+}
+
+function noop() {}
+
+export {
   emptyObject,
+  isObject,
+  isFunction,
+  isString,
+  noop,
   keys,
+  peek,
   cloneDeep,
   assign,
   arrayHead,
