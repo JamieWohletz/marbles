@@ -140,5 +140,5 @@
   });
   marble.step();
   marble.start();
-} ());
+}());
 

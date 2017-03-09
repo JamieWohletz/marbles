@@ -65,12 +65,13 @@ export default class Marbles {
 
     function chainData(list, upToNode) {
       const data = emptyObject();
+      const stop = isObject(upToNode) ? upToNode : { data: {} };
       let next = list;
-      while (next && next !== upToNode) {
+      while (next && next !== stop) {
         assign(data, next.data);
         next = next.next;
       }
-      return assign(data, upToNode.data);
+      return assign(data, stop.data);
     }
 
     function graphNodeToListNode(id, graph) {
@@ -119,11 +120,11 @@ export default class Marbles {
       const activated = dfsActivate(nodeId, 'root', false);
       if (activated) {
         // deactivate immediate siblings
-        return parents.reduce((g, parentId) => {
-          return g[parentId].children.filter(id => id !== nodeId).reduce((retG, childId) => {
-            return deactivateGraphNode(true, childId, retG);
-          }, g);
-        }, graph);
+        return parents.reduce((g, parentId) =>
+          g[parentId].children.filter(id => id !== nodeId).reduce((retG, childId) =>
+            deactivateGraphNode(true, childId, retG),
+            g),
+          graph);
       }
       return graph;
     }
@@ -298,6 +299,9 @@ export default class Marbles {
     };
     this.remove = function remove(routeId) {
       return insertOrRemove.call(this, false, routeId);
+    };
+    this.getData = function getData() {
+      return chainData(graphToList(buildGraph(win.location.hash)));
     };
     this.step = function step() {
       const originalHash = win.location.hash;

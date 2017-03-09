@@ -5,15 +5,26 @@
     "space-infix-ops": 0,
     "default-case": 0,
     "no-else-return": 0,
-    "brace-style": [2, "stroustrup"],
-    "quote-props": [2, "consistent-as-needed"],
+    "brace-style": [
+      2,
+      "stroustrup"
+    ],
+    "quote-props": [
+      2,
+      "consistent-as-needed"
+    ],
     "new-cap": 0,
     "comma-dangle": "off",
-    "no-param-reassign": [2, { "props": false }]
+    "no-param-reassign": [
+      2,
+      {
+        "props": false
+      }
+    ]
   },
   "parserOptions": {
     "ecmaFeatures": {
-      "experimentalObjectRestSpread": true,
+      "experimentalObjectRestSpread": true
     }
-  },
+  }
 }
