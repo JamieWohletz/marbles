@@ -114,12 +114,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	  function chainData(list, upToNode) {
 	    var data = (0, _util.emptyObject)();
+	    var stop = (0, _util.isObject)(upToNode) ? upToNode : { data: {} };
 	    var next = list;
-	    while (next && next !== upToNode) {
+	    while (next && next !== stop) {
 	      (0, _util.assign)(data, next.data);
 	      next = next.next;
 	    }
-	    return (0, _util.assign)(data, upToNode.data);
+	    return (0, _util.assign)(data, stop.data);
 	  }
 	
 	  function graphNodeToListNode(id, graph) {
@@ -347,6 +348,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	  };
 	  this.remove = function remove(routeId) {
 	    return insertOrRemove.call(this, false, routeId);
+	  };
+	  this.getData = function getData() {
+	    return chainData(graphToList(buildGraph(win.location.hash)));
 	  };
 	  this.step = function step() {
 	    var originalHash = win.location.hash;

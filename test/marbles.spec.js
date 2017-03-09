@@ -50,10 +50,19 @@ const routes = {
   },
   'user-edit': {
     active: false,
-    children: [],
+    children: ['user-edit-product'],
     data: {},
     dependency: 'user-profile',
     segment: 'edit'
+  },
+  'user-edit-product': {
+    active: false,
+    children: [],
+    data: {
+      productId: null
+    },
+    dependency: 'user-edit',
+    segment: 'products/:productId'
   }
 };
 let marbles;
@@ -329,6 +338,22 @@ describe('Marbles', () => {
       });
       marbles.insert('user', { userId: 1 });
       marbles.step();
+    });
+  });
+  describe('getData()', () => {
+    it('should give an empty object when no dynamic segments are present', () => {
+      marbles.insert('home');
+      assert.deepEqual(marbles.getData(), {});
+    });
+    it('should return an object with all dynamic segment data', () => {
+      marbles.insert('user', { userId: 1 });
+      marbles.insert('user-profile');
+      marbles.insert('user-edit');
+      marbles.insert('user-edit-product', { productId: 3 });
+      assert.deepEqual(marbles.getData(), {
+        productId: '3',
+        userId: '1'
+      });
     });
   });
 });
