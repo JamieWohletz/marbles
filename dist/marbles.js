@@ -64,6 +64,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _util = __webpack_require__(1);
 	
+	var util = _interopRequireWildcard(_util);
+	
+	function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 	
 	var Marbles = function Marbles(routingGraph) {
@@ -74,10 +78,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	  var IMMUTABLE_GRAPH = routingGraph;
 	  var DYNAMIC_SEGMENT_REGEX = /:[a-zA-Z]+(?=\/?)/;
 	  var DIGIT_SEGMENT_REGEX = /\d+(?=\/?)/;
-	  var observers = (0, _util.keys)(IMMUTABLE_GRAPH).reduce(function (obj, key) {
+	  var observers = util.keys(IMMUTABLE_GRAPH).reduce(function (obj, key) {
 	    obj[key] = [];
 	    return obj;
-	  }, (0, _util.emptyObject)());
+	  }, util.emptyObject());
 	  var graphStack = [];
 	
 	  // Private methods
@@ -91,8 +95,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var dynamicSegments = templateSegment.match(new RegExp(DYNAMIC_SEGMENT_REGEX.source, 'g')) || [];
 	    return (segmentWithData.match(DIGIT_SEGMENT_REGEX) || []).reduce(function (data, value, index) {
 	      data[dynamicSegments[index].replace(':', '')] = value;
-	      return (0, _util.assign)((0, _util.emptyObject)(), data);
-	    }, (0, _util.emptyObject)());
+	      return util.assign(util.emptyObject(), data);
+	    }, util.emptyObject());
 	  }
 	
 	  function segmentToRegex(segment) {
@@ -113,19 +117,19 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 	
 	  function chainData(list, upToNode) {
-	    var data = (0, _util.emptyObject)();
-	    var stop = (0, _util.isObject)(upToNode) ? upToNode : { data: {} };
+	    var data = util.emptyObject();
+	    var stop = util.isObject(upToNode) ? upToNode : { data: {} };
 	    var next = list;
 	    while (next && next !== stop) {
-	      (0, _util.assign)(data, next.data);
+	      util.assign(data, next.data);
 	      next = next.next;
 	    }
-	    return (0, _util.assign)(data, stop.data);
+	    return util.assign(data, stop.data);
 	  }
 	
 	  function graphNodeToListNode(id, graph) {
 	    var graphNode = graph[id];
-	    return (0, _util.assign)((0, _util.emptyObject)(), graphNode, {
+	    return util.assign(util.emptyObject(), graphNode, {
 	      id: id,
 	      segment: expandSegment(graphNode.segment, graphNode.data),
 	      next: null
@@ -133,12 +137,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 	
 	  function deactivateGraphNode(force, nodeId, immutableGraph) {
-	    var graph = (0, _util.cloneDeep)(immutableGraph);
+	    var graph = util.cloneDeep(immutableGraph);
 	    function recDeactivate(target, current, g) {
 	      var curr = g[current];
 	      if (target === current || curr.dependency === target || force) {
 	        curr.active = false;
-	        curr.data = (0, _util.emptyObject)();
+	        curr.data = util.emptyObject();
 	      }
 	      curr.children.forEach(function (childId) {
 	        return recDeactivate(target, childId, g);
@@ -149,8 +153,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 	
 	  function activateGraphNode(nodeId, data, immutableGraph) {
-	    var graph = (0, _util.cloneDeep)(immutableGraph);
-	    var parents = (0, _util.keys)(graph).filter(function (key) {
+	    var graph = util.cloneDeep(immutableGraph);
+	    var parents = util.keys(graph).filter(function (key) {
 	      return graph[key].children.indexOf(nodeId) !== -1;
 	    });
 	    function dfsActivate(searchId, currentId, dependencyMet) {
@@ -183,7 +187,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 	
 	  function appendNode(node, head) {
-	    var clonedHead = (0, _util.cloneDeep)(head);
+	    var clonedHead = util.cloneDeep(head);
 	    var next = clonedHead;
 	    var last = void 0;
 	    var dependencyMet = false;
@@ -193,7 +197,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      next = next.next;
 	    }
 	    if (dependencyMet) {
-	      last.next = (0, _util.cloneDeep)(node);
+	      last.next = util.cloneDeep(node);
 	    }
 	    return clonedHead;
 	  }
@@ -210,13 +214,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	          return newG;
 	        }
 	        visitedNodes[childId] = true;
-	        if (matches.length > 0 && (graph[child.dependency] || (0, _util.emptyObject)()).active) {
-	          newG = activateGraphNode(childId, extractSegmentData(child.segment, (0, _util.arrayHead)(matches)), graph);
+	        if (matches.length > 0 && (graph[child.dependency] || util.emptyObject()).active) {
+	          newG = activateGraphNode(childId, extractSegmentData(child.segment, util.arrayHead(matches)), graph);
 	        }
 	        return recParse(hash.substr(substrIndex), childId, visitedNodes, newG);
 	      }, graph);
 	    }
-	    var newGraph = (0, _util.cloneDeep)(routeGraph);
+	    var newGraph = util.cloneDeep(routeGraph);
 	    return recParse(hashRoute, 'root', {}, newGraph);
 	  }
 	
@@ -225,21 +229,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 	
 	  function listToHashRoute(head) {
-	    var str = '#';
-	    var next = head;
-	    while (next) {
-	      if (next.segment) {
-	        str += next.segment + '/';
+	    return util.listReduce(function (hash, node) {
+	      if (node.segment) {
+	        return '' + hash + node.segment + '/';
 	      }
-	      next = next.next;
-	    }
-	    return str;
+	      return hash;
+	    }, '#', head);
 	  }
 	
 	  function graphToLinkedList(graph, rootId, listHead, visitedNodes) {
 	    var root = graph[rootId];
 	    var nextListNode = graphNodeToListNode(rootId, graph);
-	    var newHead = root.active ? appendNode(nextListNode, listHead) : (0, _util.cloneDeep)(listHead);
+	    var newHead = root.active ? appendNode(nextListNode, listHead) : util.cloneDeep(listHead);
 	
 	    return root.children.reduce(function (head, childId) {
 	      if (visitedNodes[childId]) {
@@ -251,7 +252,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  }
 	
 	  function logGraph(newGraph) {
-	    var lastGraph = (0, _util.peek)(graphStack);
+	    var lastGraph = util.peek(graphStack);
 	    if (!lastGraph || JSON.stringify(lastGraph) !== JSON.stringify(newGraph)) {
 	      graphStack.push(newGraph);
 	    }
@@ -262,45 +263,44 @@ return /******/ (function(modules) { // webpackBootstrap
 	    if (!graph) {
 	      return null;
 	    }
-	    return graphToLinkedList(graph, 'root', graphNodeToListNode('root', graph), (0, _util.emptyObject)());
+	    return graphToLinkedList(graph, 'root', graphNodeToListNode('root', graph), util.emptyObject());
+	  }
+	
+	  function listDiff(from, against) {
+	    return util.listReduce(function (arr, node) {
+	      if (!findListNode(node.id, against)) {
+	        return arr.concat(node);
+	      }
+	      return arr;
+	    }, [], from);
 	  }
 	
 	  function notifyObservers(obsObj, oldGraph, newGraph) {
 	    var oldListHead = graphToList(oldGraph);
 	    var newListHead = graphToList(newGraph);
-	    var missing = function () {
-	      var nxt = oldListHead;
-	      var arr = [];
-	      while (nxt) {
-	        if (!findListNode(nxt.id, newListHead)) {
-	          arr.push(nxt.id);
-	        }
-	        nxt = nxt.next;
-	      }
-	      return arr;
-	    }();
-	    missing.forEach(function (routeId) {
-	      obsObj[routeId].forEach(function (obs) {
+	    var removed = listDiff(oldListHead, newListHead);
+	    var insertedNodes = listDiff(newListHead, oldListHead);
+	    removed.forEach(function (_ref) {
+	      var id = _ref.id;
+	
+	      obsObj[id].forEach(function (obs) {
 	        obs.removed();
 	      });
 	    });
-	    var next = newListHead;
-	    while (next) {
-	      var observerArray = obsObj[next.id];
-	      for (var i = 0; i < observerArray.length; i++) {
-	        observerArray[i].inserted(chainData(newListHead, next));
-	      }
-	      next = next.next;
-	    }
+	    insertedNodes.forEach(function (node) {
+	      obsObj[node.id].forEach(function (obs) {
+	        obs.inserted(chainData(newListHead, node));
+	      });
+	    });
 	  }
 	
 	  function insertOrRemove(insert, routeId, data) {
 	    var dataToUse = data;
-	    if (!(0, _util.isString)(routeId) || !IMMUTABLE_GRAPH[routeId]) {
+	    if (!util.isString(routeId) || !IMMUTABLE_GRAPH[routeId]) {
 	      return null;
 	    }
 	    if (data === null || (typeof data === 'undefined' ? 'undefined' : _typeof(data)) !== 'object' || data instanceof Array) {
-	      dataToUse = (0, _util.emptyObject)();
+	      dataToUse = util.emptyObject();
 	    }
 	    var graph = buildGraph(win.location.hash);
 	    var newGraph = void 0;
@@ -316,10 +316,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	  // Public methods
 	  this.subscribe = function subscribe(subscriptions) {
-	    if (!(0, _util.isObject)(subscriptions)) {
+	    if (!util.isObject(subscriptions)) {
 	      return false;
 	    }
-	    var matchingKeys = (0, _util.keys)(subscriptions).filter(function (key) {
+	    var matchingKeys = util.keys(subscriptions).filter(function (key) {
 	      return !!observers[key];
 	    });
 	    if (matchingKeys.length === 0) {
@@ -328,20 +328,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	    matchingKeys.forEach(function (key) {
 	      var sub = subscriptions[key];
 	      observers[key].push({
-	        inserted: sub.inserted || _util.noop,
-	        removed: sub.removed || _util.noop
+	        inserted: sub.inserted || util.noop,
+	        removed: sub.removed || util.noop
 	      });
 	    });
 	    return true;
 	  };
 	  this.unsubscribe = function unsubscribe(route, event, handler) {
-	    if (!(0, _util.isString)(route) || !(0, _util.isString)(event) || !(0, _util.isFunction)(handler) || !observers[route]) {
+	    if (!util.isString(route) || !util.isString(event) || !util.isFunction(handler) || !observers[route]) {
 	      return false;
 	    }
 	    var matchingObservers = observers[route].filter(function (obs) {
 	      return obs[event] === handler;
 	    });
-	    return (0, _util.pull)(matchingObservers, observers[route]);
+	    return util.pull(matchingObservers, observers[route]);
 	  };
 	  this.insert = function insert(routeId, data) {
 	    return insertOrRemove.call(this, true, routeId, data);
@@ -357,7 +357,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var graph = buildGraph(originalHash);
 	    notifyObservers(observers, graphStack.pop(), graph);
 	    logGraph(graph);
-	    win.history.replaceState((0, _util.emptyObject)(), '', listToHashRoute(graphToList(graph)));
+	    win.history.replaceState(util.emptyObject(), '', listToHashRoute(graphToList(graph)));
 	    return this;
 	  };
 	
@@ -393,6 +393,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	function isObject(any) {
 	  return (typeof any === 'undefined' ? 'undefined' : _typeof(any)) === 'object' && any !== null && !(any instanceof Array);
+	}
+	
+	function isArray(any) {
+	  return any instanceof Array;
 	}
 	
 	function isString(any) {
@@ -460,10 +464,76 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	function noop() {}
 	
+	function isList(listish) {
+	  return listish === null || isObject(listish) && _typeof(listish.next) === 'object';
+	}
+	
+	function assertList(list) {
+	  if (!isList(list)) {
+	    throw new TypeError('listForEach requires a list! Lists are objects with a `next` property.');
+	  }
+	}
+	
+	function listForEach(iterator, list) {
+	  assertList(list);
+	  var next = list;
+	  var i = 0;
+	  while (next) {
+	    iterator(next, i);
+	    next = next.next;
+	    i = i + 1;
+	  }
+	}
+	
+	function listMap(iterator, list) {
+	  var newNodes = [];
+	  listForEach(function (node, index) {
+	    newNodes.push(iterator(node, index));
+	  }, list);
+	  return newNodes.reduceRight(function (tail, node) {
+	    return assign({}, node, {
+	      next: tail
+	    });
+	  }, null);
+	}
+	
+	function listReduce(reducer, accumulator, list) {
+	  return function foldl(f, a, head, i) {
+	    if (head === null) {
+	      return a;
+	    }
+	    assertList(head);
+	    return foldl(f, f(a, head, i), head.next, i + 1);
+	  }(reducer, accumulator, list, 0);
+	}
+	
+	function batchAsyncActions(fns, callback) {
+	  if (!isArray(fns)) {
+	    throw new TypeError('batchAsyncResults() expects an array of functions as the first parameter.');
+	  }
+	  var resolvedCount = 0;
+	  var results = [];
+	  fns.forEach(function (fn) {
+	    fn(function (result) {
+	      resolvedCount += 1;
+	      results.push(result);
+	      if (resolvedCount === fns.length) {
+	        callback(results);
+	      }
+	    });
+	  });
+	}
+	
 	exports.emptyObject = emptyObject;
+	exports.isArray = isArray;
 	exports.isObject = isObject;
 	exports.isFunction = isFunction;
 	exports.isString = isString;
+	exports.isList = isList;
+	exports.listForEach = listForEach;
+	exports.listMap = listMap;
+	exports.listReduce = listReduce;
+	exports.batchAsyncActions = batchAsyncActions;
 	exports.noop = noop;
 	exports.keys = keys;
 	exports.peek = peek;

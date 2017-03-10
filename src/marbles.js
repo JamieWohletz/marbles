@@ -1,26 +1,14 @@
-import {
-  pull,
-  isString,
-  isFunction,
-  emptyObject,
-  noop,
-  keys,
-  cloneDeep,
-  assign,
-  arrayHead,
-  isObject,
-  peek
-} from './util.js';
+import * as util from './util.js';
 
 export default class Marbles {
   constructor(routingGraph, win = window) {
     const IMMUTABLE_GRAPH = routingGraph;
     const DYNAMIC_SEGMENT_REGEX = /:[a-zA-Z]+(?=\/?)/;
     const DIGIT_SEGMENT_REGEX = /\d+(?=\/?)/;
-    const observers = keys(IMMUTABLE_GRAPH).reduce((obj, key) => {
+    const observers = util.keys(IMMUTABLE_GRAPH).reduce((obj, key) => {
       obj[key] = [];
       return obj;
-    }, emptyObject());
+    }, util.emptyObject());
     const graphStack = [];
 
     // Private methods
@@ -37,9 +25,9 @@ export default class Marbles {
       ) || [];
       return (segmentWithData.match(DIGIT_SEGMENT_REGEX) || []).reduce((data, value, index) => {
         data[dynamicSegments[index].replace(':', '')] = value;
-        return assign(emptyObject(), data);
+        return util.assign(util.emptyObject(), data);
       },
-        emptyObject()
+        util.emptyObject()
       );
     }
 
@@ -64,19 +52,19 @@ export default class Marbles {
     }
 
     function chainData(list, upToNode) {
-      const data = emptyObject();
-      const stop = isObject(upToNode) ? upToNode : { data: {} };
+      const data = util.emptyObject();
+      const stop = util.isObject(upToNode) ? upToNode : { data: {} };
       let next = list;
       while (next && next !== stop) {
-        assign(data, next.data);
+        util.assign(data, next.data);
         next = next.next;
       }
-      return assign(data, stop.data);
+      return util.assign(data, stop.data);
     }
 
     function graphNodeToListNode(id, graph) {
       const graphNode = graph[id];
-      return assign(emptyObject(), graphNode, {
+      return util.assign(util.emptyObject(), graphNode, {
         id,
         segment: expandSegment(graphNode.segment, graphNode.data),
         next: null,
@@ -84,12 +72,12 @@ export default class Marbles {
     }
 
     function deactivateGraphNode(force, nodeId, immutableGraph) {
-      const graph = cloneDeep(immutableGraph);
+      const graph = util.cloneDeep(immutableGraph);
       function recDeactivate(target, current, g) {
         const curr = g[current];
         if (target === current || curr.dependency === target || force) {
           curr.active = false;
-          curr.data = emptyObject();
+          curr.data = util.emptyObject();
         }
         curr.children.forEach(childId => recDeactivate(target, childId, g));
       }
@@ -98,8 +86,8 @@ export default class Marbles {
     }
 
     function activateGraphNode(nodeId, data, immutableGraph) {
-      const graph = cloneDeep(immutableGraph);
-      const parents = keys(graph).filter(key => graph[key].children.indexOf(nodeId) !== -1);
+      const graph = util.cloneDeep(immutableGraph);
+      const parents = util.keys(graph).filter(key => graph[key].children.indexOf(nodeId) !== -1);
       function dfsActivate(searchId, currentId, dependencyMet) {
         const curr = graph[currentId];
         const search = graph[searchId];
@@ -130,7 +118,7 @@ export default class Marbles {
     }
 
     function appendNode(node, head) {
-      const clonedHead = cloneDeep(head);
+      const clonedHead = util.cloneDeep(head);
       let next = clonedHead;
       let last;
       let dependencyMet = false;
@@ -140,7 +128,7 @@ export default class Marbles {
         next = next.next;
       }
       if (dependencyMet) {
-        last.next = cloneDeep(node);
+        last.next = util.cloneDeep(node);
       }
       return clonedHead;
     }
@@ -157,17 +145,17 @@ export default class Marbles {
             return newG;
           }
           visitedNodes[childId] = true;
-          if (matches.length > 0 && (graph[child.dependency] || emptyObject()).active) {
+          if (matches.length > 0 && (graph[child.dependency] || util.emptyObject()).active) {
             newG = activateGraphNode(
               childId,
-              extractSegmentData(child.segment, arrayHead(matches)),
+              extractSegmentData(child.segment, util.arrayHead(matches)),
               graph
             );
           }
           return recParse(hash.substr(substrIndex), childId, visitedNodes, newG);
         }, graph);
       }
-      const newGraph = cloneDeep(routeGraph);
+      const newGraph = util.cloneDeep(routeGraph);
       return recParse(hashRoute, 'root', {}, newGraph);
     }
 
@@ -176,21 +164,18 @@ export default class Marbles {
     }
 
     function listToHashRoute(head) {
-      let str = '#';
-      let next = head;
-      while (next) {
-        if (next.segment) {
-          str += `${next.segment}/`;
+      return util.listReduce((hash, node) => {
+        if (node.segment) {
+          return `${hash}${node.segment}/`;
         }
-        next = next.next;
-      }
-      return str;
+        return hash;
+      }, '#', head);
     }
 
     function graphToLinkedList(graph, rootId, listHead, visitedNodes) {
       const root = graph[rootId];
       const nextListNode = graphNodeToListNode(rootId, graph);
-      const newHead = root.active ? appendNode(nextListNode, listHead) : cloneDeep(listHead);
+      const newHead = root.active ? appendNode(nextListNode, listHead) : util.cloneDeep(listHead);
 
       return root.children.reduce(
         (head, childId) => {
@@ -205,7 +190,7 @@ export default class Marbles {
     }
 
     function logGraph(newGraph) {
-      const lastGraph = peek(graphStack);
+      const lastGraph = util.peek(graphStack);
       if (!lastGraph || JSON.stringify(lastGraph) !== JSON.stringify(newGraph)) {
         graphStack.push(newGraph);
       }
@@ -216,45 +201,47 @@ export default class Marbles {
       if (!graph) {
         return null;
       }
-      return graphToLinkedList(graph, 'root', graphNodeToListNode('root', graph), emptyObject());
+      return graphToLinkedList(
+        graph,
+        'root',
+        graphNodeToListNode('root', graph),
+        util.emptyObject()
+      );
+    }
+
+    function listDiff(from, against) {
+      return util.listReduce((arr, node) => {
+        if (!findListNode(node.id, against)) {
+          return arr.concat(node);
+        }
+        return arr;
+      }, [], from);
     }
 
     function notifyObservers(obsObj, oldGraph, newGraph) {
       const oldListHead = graphToList(oldGraph);
       const newListHead = graphToList(newGraph);
-      const missing = (() => {
-        let nxt = oldListHead;
-        const arr = [];
-        while (nxt) {
-          if (!findListNode(nxt.id, newListHead)) {
-            arr.push(nxt.id);
-          }
-          nxt = nxt.next;
-        }
-        return arr;
-      })();
-      missing.forEach((routeId) => {
-        obsObj[routeId].forEach((obs) => {
+      const removed = listDiff(oldListHead, newListHead);
+      const insertedNodes = listDiff(newListHead, oldListHead);
+      removed.forEach(({ id }) => {
+        obsObj[id].forEach((obs) => {
           obs.removed();
         });
       });
-      let next = newListHead;
-      while (next) {
-        const observerArray = obsObj[next.id];
-        for (let i = 0; i < observerArray.length; i++) {
-          observerArray[i].inserted(chainData(newListHead, next));
-        }
-        next = next.next;
-      }
+      insertedNodes.forEach((node) => {
+        obsObj[node.id].forEach((obs) => {
+          obs.inserted(chainData(newListHead, node));
+        });
+      });
     }
 
     function insertOrRemove(insert, routeId, data) {
       let dataToUse = data;
-      if (!isString(routeId) || !IMMUTABLE_GRAPH[routeId]) {
+      if (!util.isString(routeId) || !IMMUTABLE_GRAPH[routeId]) {
         return null;
       }
       if (data === null || typeof data !== 'object' || data instanceof Array) {
-        dataToUse = emptyObject();
+        dataToUse = util.emptyObject();
       }
       const graph = buildGraph(win.location.hash);
       let newGraph;
@@ -271,28 +258,33 @@ export default class Marbles {
 
     // Public methods
     this.subscribe = function subscribe(subscriptions) {
-      if (!isObject(subscriptions)) {
+      if (!util.isObject(subscriptions)) {
         return false;
       }
-      const matchingKeys = keys(subscriptions).filter(key => !!observers[key]);
+      const matchingKeys = util.keys(subscriptions).filter(key => !!observers[key]);
       if (matchingKeys.length === 0) {
         return false;
       }
       matchingKeys.forEach(key => {
         const sub = subscriptions[key];
         observers[key].push({
-          inserted: sub.inserted || noop,
-          removed: sub.removed || noop,
+          inserted: sub.inserted || util.noop,
+          removed: sub.removed || util.noop,
         });
       });
       return true;
     };
     this.unsubscribe = function unsubscribe(route, event, handler) {
-      if (!isString(route) || !isString(event) || !isFunction(handler) || !observers[route]) {
+      if (
+        !util.isString(route) ||
+        !util.isString(event) ||
+        !util.isFunction(handler) ||
+        !observers[route]
+      ) {
         return false;
       }
       const matchingObservers = observers[route].filter((obs) => obs[event] === handler);
-      return pull(matchingObservers, observers[route]);
+      return util.pull(matchingObservers, observers[route]);
     };
     this.insert = function insert(routeId, data) {
       return insertOrRemove.call(this, true, routeId, data);
@@ -308,7 +300,7 @@ export default class Marbles {
       const graph = buildGraph(originalHash);
       notifyObservers(observers, graphStack.pop(), graph);
       logGraph(graph);
-      win.history.replaceState(emptyObject(), '', listToHashRoute(graphToList(graph)));
+      win.history.replaceState(util.emptyObject(), '', listToHashRoute(graphToList(graph)));
       return this;
     };
 
