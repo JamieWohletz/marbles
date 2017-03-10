@@ -98,7 +98,6 @@ describe('Marbles', () => {
     });
   });
   describe('subscribe()', () => {
-    // TODO: tests for inserted and removed
     it('should only accept an object as a parameter', () => {
       assert.isNotOk(marbles.subscribe('asdf'));
       assert.isNotOk(marbles.subscribe(32));
@@ -306,6 +305,22 @@ describe('Marbles', () => {
       assert.include(win.location.hash, 'home');
       marbles.insert('home', {});
       assert.equal(win.location.hash, hashAfterOneCall);
+    });
+    it('ignores sequential duplicate calls with data', (done) => {
+      marbles.subscribe({
+        user: {
+          inserted: () => {
+            done();
+          }
+        }
+      });
+      marbles.start();
+      marbles.insert('user', {
+        userId: 1
+      });
+      marbles.insert('user', {
+        userId: '1'
+      });
     });
     it('ignores routes whose dependencies are unmet', () => {
       const originalHash = win.location.hash;
