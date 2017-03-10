@@ -133,6 +133,72 @@ describe('Marbles', () => {
         marbles.insert('home');
         marbles.step();
       });
+      it('should notify on changed data', () => {
+        const passedNewData = sinon.spy();
+        const calledOnce = sinon.spy();
+        marbles.insert('user', {
+          userId: 1
+        });
+        marbles.step();
+        marbles.subscribe({
+          user: {
+            inserted: passedNewData,
+            removed: calledOnce
+          }
+        });
+        marbles.insert('user', {
+          userId: 2
+        });
+        marbles.step();
+        assert.ok(passedNewData.calledOnce);
+        assert.deepEqual(passedNewData.args[0][0], { userId: '2' });
+        assert.ok(calledOnce.calledOnce);
+      });
+      it('should notify subscribers for inserted node and its children', () => {
+        const spy = sinon.spy();
+        win.location.hash = 'users/1/profile/details';
+        marbles.step();
+        marbles.subscribe({
+          'user': {
+            inserted: spy
+          },
+          'user-profile': {
+            inserted: spy
+          },
+          'user-optional-details': {
+            inserted: spy
+          }
+        });
+        marbles.insert('user', {
+          userId: 2
+        });
+        marbles.step();
+        assert.ok(spy.calledThrice);
+      });
+      it('should NOT notify subscribers for parents of inserted node', () => {
+        const shouldNotBeCalled = sinon.spy();
+        const shouldBeCalled = sinon.spy();
+        win.location.hash = 'users/1/profile/edit';
+        marbles.step();
+        marbles.subscribe({
+          'user': {
+            inserted: shouldNotBeCalled
+          },
+          'user-profile': {
+            inserted: shouldNotBeCalled
+          },
+          'user-optional-details': {
+            inserted: shouldBeCalled
+          },
+          'user-edit': {
+            inserted: shouldBeCalled
+          }
+        });
+        marbles.insert('user-optional-details');
+        marbles.step();
+        assert.ok(shouldBeCalled.calledTwice);
+        assert.ok(shouldNotBeCalled.notCalled);
+      });
       it('should notify on removal', (done) => {
         marbles.subscribe({
           home: {
@@ -145,6 +211,25 @@ describe('Marbles', () => {
         marbles.step();
         marbles.remove('home');
         marbles.step();
+      });
+      it('should notify listeners for removed node and its dependents', () => {
+        const spy = sinon.spy();
+        win.location.hash = 'users/1/profile/details';
+        marbles.step();
+        marbles.subscribe({
+          'user': {
+            removed: spy
+          },
+          'user-profile': {
+            removed: spy
+          },
+          'user-optional-details': {
+            removed: spy
+          }
+        });
+        marbles.remove('user');
+        marbles.step();
+        assert.ok(spy.calledThrice);
       });
       it('should notify on both insertion and removal', () => {
         const shouldBeCalled = sinon.spy();
@@ -245,7 +330,7 @@ describe('Marbles', () => {
       marbles.remove('user-profile');
       assert.include(win.location.hash, 'home');
     });
-    it('removes segments and their dependencies', () => {
+    it('removes segments and their dependents', () => {
       const route = 'users/1/profile/details';
       win.location.hash = route;
       marbles.remove('user');
