@@ -291,7 +291,15 @@ describe('Marbles', () => {
       marbles.insert('user-optional-details', {});
       assert.include(win.location.hash, 'users/1/profile/details/edit');
     });
-    it('ignores sequential duplicate calls', () => {
+    it('ignores sequential duplicate calls', (done) => {
+      marbles.subscribe({
+        home: {
+          inserted: () => {
+            done();
+          }
+        }
+      });
+      marbles.start();
       win.location.hash = '';
       marbles.insert('home', {});
       const hashAfterOneCall = win.location.hash;
