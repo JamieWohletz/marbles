@@ -1,3 +1,5 @@
+const deepEqual = require('deep-equal');
+
 function emptyObject() {
   return Object.create(null);
 }
@@ -132,6 +134,7 @@ function batchAsyncActions(fns, callback) {
 }
 
 export {
+  deepEqual as equal,
   emptyObject,
   isArray,
   isObject,

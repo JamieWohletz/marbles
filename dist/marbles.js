@@ -268,7 +268,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	  function listDiff(from, against) {
 	    return util.listReduce(function (arr, node) {
-	      if (!findListNode(node.id, against)) {
+	      var found = findListNode(node.id, against);
+	      if (!found || !util.equal(found.data, node.data)) {
 	        return arr.concat(node);
 	      }
 	      return arr;
@@ -280,18 +281,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var newListHead = graphToList(newGraph);
 	    var removed = listDiff(oldListHead, newListHead);
 	    var insertedNodes = listDiff(newListHead, oldListHead);
-	    removed.forEach(function (_ref) {
-	      var id = _ref.id;
-	
-	      obsObj[id].forEach(function (obs) {
-	        obs.removed();
+	    removed.forEach(function (node) {
+	      obsObj[node.id].forEach(function (obs) {
+	        obs.removed(chainData(oldListHead, node));
 	      });
 	    });
-	    insertedNodes.forEach(function (node) {
+	    util.listForEach(function (node) {
 	      obsObj[node.id].forEach(function (obs) {
 	        obs.inserted(chainData(newListHead, node));
 	      });
-	    });
+	    }, insertedNodes[0] || null);
 	  }
 	
 	  function insertOrRemove(insert, routeId, data) {
@@ -353,8 +352,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return chainData(graphToList(buildGraph(win.location.hash)));
 	  };
 	  this.step = function step() {
-	    var originalHash = win.location.hash;
-	    var graph = buildGraph(originalHash);
+	    var hash = win.location.hash;
+	    var graph = buildGraph(hash);
 	    notifyObservers(observers, graphStack.pop(), graph);
 	    logGraph(graph);
 	    win.history.replaceState(util.emptyObject(), '', listToHashRoute(graphToList(graph)));
@@ -377,7 +376,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 /***/ },
 /* 1 */
-/***/ function(module, exports) {
+/***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 	
@@ -386,6 +385,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	});
 	
 	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+	
+	var deepEqual = __webpack_require__(2);
 	
 	function emptyObject() {
 	  return Object.create(null);
@@ -524,6 +525,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  });
 	}
 	
+	exports.equal = deepEqual;
 	exports.emptyObject = emptyObject;
 	exports.isArray = isArray;
 	exports.isObject = isObject;
@@ -542,6 +544,147 @@ return /******/ (function(modules) { // webpackBootstrap
 	exports.arrayHead = arrayHead;
 	exports.pull = pull;
 	exports.without = without;
+
+/***/ },
+/* 2 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var pSlice = Array.prototype.slice;
+	var objectKeys = __webpack_require__(3);
+	var isArguments = __webpack_require__(4);
+	
+	var deepEqual = module.exports = function (actual, expected, opts) {
+	  if (!opts) opts = {};
+	  // 7.1. All identical values are equivalent, as determined by ===.
+	  if (actual === expected) {
+	    return true;
+	
+	  } else if (actual instanceof Date && expected instanceof Date) {
+	    return actual.getTime() === expected.getTime();
+	
+	  // 7.3. Other pairs that do not both pass typeof value == 'object',
+	  // equivalence is determined by ==.
+	  } else if (!actual || !expected || typeof actual != 'object' && typeof expected != 'object') {
+	    return opts.strict ? actual === expected : actual == expected;
+	
+	  // 7.4. For all other Object pairs, including Array objects, equivalence is
+	  // determined by having the same number of owned properties (as verified
+	  // with Object.prototype.hasOwnProperty.call), the same set of keys
+	  // (although not necessarily the same order), equivalent values for every
+	  // corresponding key, and an identical 'prototype' property. Note: this
+	  // accounts for both named and indexed properties on Arrays.
+	  } else {
+	    return objEquiv(actual, expected, opts);
+	  }
+	}
+	
+	function isUndefinedOrNull(value) {
+	  return value === null || value === undefined;
+	}
+	
+	function isBuffer (x) {
+	  if (!x || typeof x !== 'object' || typeof x.length !== 'number') return false;
+	  if (typeof x.copy !== 'function' || typeof x.slice !== 'function') {
+	    return false;
+	  }
+	  if (x.length > 0 && typeof x[0] !== 'number') return false;
+	  return true;
+	}
+	
+	function objEquiv(a, b, opts) {
+	  var i, key;
+	  if (isUndefinedOrNull(a) || isUndefinedOrNull(b))
+	    return false;
+	  // an identical 'prototype' property.
+	  if (a.prototype !== b.prototype) return false;
+	  //~~~I've managed to break Object.keys through screwy arguments passing.
+	  //   Converting to array solves the problem.
+	  if (isArguments(a)) {
+	    if (!isArguments(b)) {
+	      return false;
+	    }
+	    a = pSlice.call(a);
+	    b = pSlice.call(b);
+	    return deepEqual(a, b, opts);
+	  }
+	  if (isBuffer(a)) {
+	    if (!isBuffer(b)) {
+	      return false;
+	    }
+	    if (a.length !== b.length) return false;
+	    for (i = 0; i < a.length; i++) {
+	      if (a[i] !== b[i]) return false;
+	    }
+	    return true;
+	  }
+	  try {
+	    var ka = objectKeys(a),
+	        kb = objectKeys(b);
+	  } catch (e) {//happens when one is a string literal and the other isn't
+	    return false;
+	  }
+	  // having the same number of owned properties (keys incorporates
+	  // hasOwnProperty)
+	  if (ka.length != kb.length)
+	    return false;
+	  //the same set of keys (although not necessarily the same order),
+	  ka.sort();
+	  kb.sort();
+	  //~~~cheap key test
+	  for (i = ka.length - 1; i >= 0; i--) {
+	    if (ka[i] != kb[i])
+	      return false;
+	  }
+	  //equivalent values for every corresponding key, and
+	  //~~~possibly expensive deep test
+	  for (i = ka.length - 1; i >= 0; i--) {
+	    key = ka[i];
+	    if (!deepEqual(a[key], b[key], opts)) return false;
+	  }
+	  return typeof a === typeof b;
+	}
+
+
+/***/ },
+/* 3 */
+/***/ function(module, exports) {
+
+	exports = module.exports = typeof Object.keys === 'function'
+	  ? Object.keys : shim;
+	
+	exports.shim = shim;
+	function shim (obj) {
+	  var keys = [];
+	  for (var key in obj) keys.push(key);
+	  return keys;
+	}
+
+
+/***/ },
+/* 4 */
+/***/ function(module, exports) {
+
+	var supportsArgumentsClass = (function(){
+	  return Object.prototype.toString.call(arguments)
+	})() == '[object Arguments]';
+	
+	exports = module.exports = supportsArgumentsClass ? supported : unsupported;
+	
+	exports.supported = supported;
+	function supported(object) {
+	  return Object.prototype.toString.call(object) == '[object Arguments]';
+	};
+	
+	exports.unsupported = unsupported;
+	function unsupported(object){
+	  return object &&
+	    typeof object == 'object' &&
+	    typeof object.length == 'number' &&
+	    Object.prototype.hasOwnProperty.call(object, 'callee') &&
+	    !Object.prototype.propertyIsEnumerable.call(object, 'callee') ||
+	    false;
+	};
+
 
 /***/ }
 /******/ ])

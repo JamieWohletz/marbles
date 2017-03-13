@@ -211,7 +211,8 @@ export default class Marbles {
 
     function listDiff(from, against) {
       return util.listReduce((arr, node) => {
-        if (!findListNode(node.id, against)) {
+        const found = findListNode(node.id, against);
+        if (!found || !util.equal(found.data, node.data)) {
           return arr.concat(node);
         }
         return arr;
@@ -223,16 +224,16 @@ export default class Marbles {
       const newListHead = graphToList(newGraph);
       const removed = listDiff(oldListHead, newListHead);
       const insertedNodes = listDiff(newListHead, oldListHead);
-      removed.forEach(({ id }) => {
-        obsObj[id].forEach((obs) => {
-          obs.removed();
+      removed.forEach((node) => {
+        obsObj[node.id].forEach((obs) => {
+          obs.removed(chainData(oldListHead, node));
         });
       });
-      insertedNodes.forEach((node) => {
+      util.listForEach((node) => {
         obsObj[node.id].forEach((obs) => {
           obs.inserted(chainData(newListHead, node));
         });
-      });
+      }, insertedNodes[0] || null);
     }
 
     function insertOrRemove(insert, routeId, data) {
@@ -296,8 +297,8 @@ export default class Marbles {
       return chainData(graphToList(buildGraph(win.location.hash)));
     };
     this.step = function step() {
-      const originalHash = win.location.hash;
-      const graph = buildGraph(originalHash);
+      const hash = win.location.hash;
+      const graph = buildGraph(hash);
       notifyObservers(observers, graphStack.pop(), graph);
       logGraph(graph);
       win.history.replaceState(util.emptyObject(), '', listToHashRoute(graphToList(graph)));
