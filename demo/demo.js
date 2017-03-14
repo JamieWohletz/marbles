@@ -63,6 +63,7 @@
   const showInbox = document.getElementById('show-inbox-button');
   const showCompose = document.getElementById('show-compose-button');
   const marble = new Marbles(routes);
+  window.marble = marble;
   function hide(element) {
     element.style.display = 'none';
   }

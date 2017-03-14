@@ -133,9 +133,9 @@ describe('Marbles', () => {
         marbles.insert('home');
         marbles.step();
       });
-      it('should notify on changed data', () => {
+      it('should notify inserted listeners on changed data', () => {
         const passedNewData = sinon.spy();
-        const calledOnce = sinon.spy();
+        const notCalled = sinon.spy();
         marbles.insert('user', {
           userId: 1
         });
@@ -143,7 +143,7 @@ describe('Marbles', () => {
         marbles.subscribe({
           user: {
             inserted: passedNewData,
-            removed: calledOnce
+            removed: notCalled
           }
         });
         marbles.insert('user', {
@@ -152,7 +152,7 @@ describe('Marbles', () => {
         marbles.step();
         assert.ok(passedNewData.calledOnce);
         assert.deepEqual(passedNewData.args[0][0], { userId: '2' });
-        assert.ok(calledOnce.calledOnce);
+        assert.ok(notCalled.notCalled);
       });
       it('should notify subscribers for inserted node and its children', () => {
         const spy = sinon.spy();

@@ -266,10 +266,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return graphToLinkedList(graph, 'root', graphNodeToListNode('root', graph), util.emptyObject());
 	  }
 	
-	  function listDiff(from, against) {
+	  function listDiff(from, against, includeUpdates) {
 	    return util.listReduce(function (arr, node) {
 	      var found = findListNode(node.id, against);
-	      if (!found || !util.equal(found.data, node.data)) {
+	      if (!found || includeUpdates && !util.equal(found.data, node.data)) {
 	        return arr.concat(node);
 	      }
 	      return arr;
@@ -279,8 +279,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	  function notifyObservers(obsObj, oldGraph, newGraph) {
 	    var oldListHead = graphToList(oldGraph);
 	    var newListHead = graphToList(newGraph);
-	    var removed = listDiff(oldListHead, newListHead);
-	    var insertedNodes = listDiff(newListHead, oldListHead);
+	    var removed = listDiff(oldListHead, newListHead, false);
+	    var insertedNodes = listDiff(newListHead, oldListHead, true);
 	    removed.forEach(function (node) {
 	      obsObj[node.id].forEach(function (obs) {
 	        obs.removed(chainData(oldListHead, node));
@@ -352,11 +352,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return chainData(graphToList(buildGraph(win.location.hash)));
 	  };
 	  this.step = function step() {
-	    var hash = win.location.hash;
-	    var graph = buildGraph(hash);
-	    notifyObservers(observers, graphStack.pop(), graph);
-	    logGraph(graph);
-	    win.history.replaceState(util.emptyObject(), '', listToHashRoute(graphToList(graph)));
+	    var beginningState = win.location.hash;
+	    var beginningGraph = buildGraph(beginningState);
+	    notifyObservers(observers, graphStack.pop(), beginningGraph);
+	    logGraph(beginningGraph);
+	    var newState = win.location.hash;
+	    var newGraph = buildGraph(newState);
+	    win.history.replaceState(util.emptyObject(), '', listToHashRoute(graphToList(newGraph)));
 	    return this;
 	  };
 	
