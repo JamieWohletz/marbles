@@ -7,30 +7,32 @@
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
     crossorigin="anonymous">
 
-    <style>
-      .no-show {
-        display: none;
-      }
-    </style>
+  <style>
+    .no-show {
+      display: none;
+    }
+  </style>
 </head>
 
 <body>
-  <ul class="nav nav-pills">
+  <nav class="navbar navbar-default">
+  <ul class="nav navbar-nav">
     <li role="presentation" id="home-tab"><a href="#home">Home</a></li>
     <li role="presentation" id="profile-tab"><a href="#profile">Profile</a></li>
     <li role="presentation" id="messages-tab"><a href="#users/1/messages">Messages</a></li>
   </ul>
+  </nav>
   <div class="container-fluid">
     <div class="row">
-      <div id="home" class="col-xs-12 no-show">
+      <div id="home" class="container no-show">
         <h1>Home</h1>
         <p>This is the home screen</p>
       </div>
-      <div id="profile" class="col-xs-12 no-show">
+      <div id="profile" class="container no-show">
         <h1>Profile</h1>
         <p>This is the profile page.</p>
       </div>
-      <div id="messages" class="col-xs-12 no-show">
+      <div id="messages" class="container no-show">
         <h1>Messages for <span id="messages-user"></span></h1>
         <p>This is the messages page.</p>
         <p>
@@ -42,24 +44,39 @@
           <textarea class="form-control" rows="5"></textarea>
           <button type="submit" class="btn btn-default">Send</button>
         </form>
-        <table id="messages-inbox" class="table no-show">
-          <tr>
-            <th>Subject</th>
-            <th>Sender</th>
-          </tr>
-          <tr>
-            <td>Job Offer</td>
-            <td>John the Recruiter</td>
-          </tr>
-          <tr>
-            <td>Enlarge!</td>
-            <td>Fresh Prince of Spam</td>
-          </tr>
-          <tr>
-            <td>Wedding Invitation</td>
-            <td>Joyce</td>
-          </tr>
-        </table>
+        <div class="row">
+          <div class="col-xs-6">
+            <table id="messages-inbox" class="table table-bordered  table-hover no-show">
+              <tr>
+                <th>Subject</th>
+                <th>Sender</th>
+              </tr>
+              <tr id="email-1" class="email">
+                <td>Job Offer</td>
+                <td>John the Recruiter</td>
+              </tr>
+              <tr id="email-2" class="email">
+                <td>Enlarge!</td>
+                <td>Fresh Prince of Spam</td>
+              </tr>
+              <tr id="email-3" class="email">
+                <td>Wedding Invitation</td>
+                <td>Joyce</td>
+              </tr>
+            </table>
+          </div>
+          <div id="messages-detail" class="panel panel-default col-xs-6 no-show">
+            <div id="details-1" class="email-details no-show">
+              Hey there, I've got an exciting new job offer for you!
+            </div>
+            <div id="details-2" class="email-details no-show">
+              How are you, please send bank account details.
+            </div>
+            <div id="details-3" class="email-details no-show">
+              You are cordially invited to Miss Joyce Stephanie's wedding.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

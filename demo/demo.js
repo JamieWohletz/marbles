@@ -39,7 +39,7 @@
     },
     'messages-compose': {
       active: false,
-      children: ['messages-inbox'],
+      children: ['messages-inbox', 'messages-detail'],
       data: {},
       dependency: 'messages',
       segment: 'compose'
@@ -51,6 +51,13 @@
       dependency: 'messages',
       segment: 'inbox'
     },
+    'messages-detail': {
+      active: false,
+      children: [],
+      data: {},
+      dependency: 'messages',
+      segment: 'inbox/:messageId'
+    }
   };
   const homeTab = document.getElementById('home-tab');
   const profileTab = document.getElementById('profile-tab');
@@ -60,6 +67,7 @@
   const messages = document.getElementById('messages');
   const messagesCompose = document.getElementById('messages-compose');
   const messagesInbox = document.getElementById('messages-inbox');
+  const messagesDetail = document.getElementById('messages-detail');
   const showInbox = document.getElementById('show-inbox-button');
   const showCompose = document.getElementById('show-compose-button');
   const marble = new Marbles(routes);
@@ -121,7 +129,28 @@
       removed: () => {
         hide(messagesInbox);
       }
+    },
+    'messages-detail': {
+      inserted: (data) => {
+        show(messagesInbox);
+        show(messagesDetail);
+        document.querySelectorAll('.email-details').forEach(el => {
+          hide(el);
+        });
+        show(document.getElementById(`details-${data.messageId}`));
+      },
+      removed: () => {
+        hide(messagesInbox);
+        hide(messagesDetail);
+      }
     }
+  });
+  document.querySelectorAll('.email').forEach((el) => {
+    el.addEventListener('click', () => {
+      marble.insert('messages-detail', {
+        messageId: el.id.substr('email-'.length)
+      });
+    });
   });
   showInbox.addEventListener('click', () => {
     if (isHidden(messagesInbox)) {
