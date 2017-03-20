@@ -74,6 +74,14 @@ beforeEach(() => {
 });
 
 describe('Marbles', () => {
+  describe('constructor()', () => {
+    it('should accept valid segment configs', () => {
+      assert.ok(false);
+    });
+    it('should informatively error on invalid configs', () => {
+      assert.ok(false);
+    });
+  });
   describe('start()', () => {
     it('should listen for hashchange events', (done) => {
       marbles.subscribe({
