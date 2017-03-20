@@ -293,9 +293,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }, insertedNodes[0] || null);
 	  }
 	
-	  function insertOrRemove(insert, routeId, data) {
+	  function insertOrRemove(insert, segmentId, data) {
 	    var dataToUse = data;
-	    if (!util.isString(routeId) || !IMMUTABLE_GRAPH[routeId]) {
+	    if (!util.isString(segmentId) || !IMMUTABLE_GRAPH[segmentId]) {
 	      return null;
 	    }
 	    if (data === null || (typeof data === 'undefined' ? 'undefined' : _typeof(data)) !== 'object' || data instanceof Array) {
@@ -304,9 +304,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var graph = buildGraph(win.location.hash);
 	    var newGraph = void 0;
 	    if (insert) {
-	      newGraph = activateGraphNode(routeId, dataToUse, graph);
+	      newGraph = activateGraphNode(segmentId, dataToUse, graph);
 	    } else {
-	      newGraph = deactivateGraphNode(false, routeId, graph);
+	      newGraph = deactivateGraphNode(false, segmentId, graph);
 	    }
 	    win.location.hash = listToHashRoute(graphToList(newGraph));
 	    return this;
@@ -333,20 +333,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	    });
 	    return true;
 	  };
-	  this.unsubscribe = function unsubscribe(route, event, handler) {
-	    if (!util.isString(route) || !util.isString(event) || !util.isFunction(handler) || !observers[route]) {
+	  this.unsubscribe = function unsubscribe(segmentId, event, handler) {
+	    if (!util.isString(segmentId) || !util.isString(event) || !util.isFunction(handler) || !observers[segmentId]) {
 	      return false;
 	    }
-	    var matchingObservers = observers[route].filter(function (obs) {
+	    var matchingObservers = observers[segmentId].filter(function (obs) {
 	      return obs[event] === handler;
 	    });
-	    return util.pull(matchingObservers, observers[route]);
+	    return util.pull(matchingObservers, observers[segmentId]);
 	  };
-	  this.insert = function insert(routeId, data) {
-	    return insertOrRemove.call(this, true, routeId, data);
+	  this.insert = function insert(segmentId, data) {
+	    return insertOrRemove.call(this, true, segmentId, data);
 	  };
-	  this.remove = function remove(routeId) {
-	    return insertOrRemove.call(this, false, routeId);
+	  this.remove = function remove(segmentId) {
+	    return insertOrRemove.call(this, false, segmentId);
 	  };
 	  this.getData = function getData() {
 	    return chainData(graphToList(buildGraph(win.location.hash)));
