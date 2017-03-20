@@ -236,9 +236,9 @@ export default class Marbles {
       }, insertedNodes[0] || null);
     }
 
-    function insertOrRemove(insert, routeId, data) {
+    function insertOrRemove(insert, segmentId, data) {
       let dataToUse = data;
-      if (!util.isString(routeId) || !IMMUTABLE_GRAPH[routeId]) {
+      if (!util.isString(segmentId) || !IMMUTABLE_GRAPH[segmentId]) {
         return null;
       }
       if (data === null || typeof data !== 'object' || data instanceof Array) {
@@ -247,10 +247,10 @@ export default class Marbles {
       const graph = buildGraph(win.location.hash);
       let newGraph;
       if (insert) {
-        newGraph = activateGraphNode(routeId, dataToUse, graph);
+        newGraph = activateGraphNode(segmentId, dataToUse, graph);
       }
       else {
-        newGraph = deactivateGraphNode(false, routeId, graph);
+        newGraph = deactivateGraphNode(false, segmentId, graph);
       }
       win.location.hash = listToHashRoute(graphToList(newGraph));
       return this;
@@ -275,23 +275,23 @@ export default class Marbles {
       });
       return true;
     };
-    this.unsubscribe = function unsubscribe(route, event, handler) {
+    this.unsubscribe = function unsubscribe(segmentId, event, handler) {
       if (
-        !util.isString(route) ||
+        !util.isString(segmentId) ||
         !util.isString(event) ||
         !util.isFunction(handler) ||
-        !observers[route]
+        !observers[segmentId]
       ) {
         return false;
       }
-      const matchingObservers = observers[route].filter((obs) => obs[event] === handler);
-      return util.pull(matchingObservers, observers[route]);
+      const matchingObservers = observers[segmentId].filter((obs) => obs[event] === handler);
+      return util.pull(matchingObservers, observers[segmentId]);
     };
-    this.insert = function insert(routeId, data) {
-      return insertOrRemove.call(this, true, routeId, data);
+    this.insert = function insert(segmentId, data) {
+      return insertOrRemove.call(this, true, segmentId, data);
     };
-    this.remove = function remove(routeId) {
-      return insertOrRemove.call(this, false, routeId);
+    this.remove = function remove(segmentId) {
+      return insertOrRemove.call(this, false, segmentId);
     };
     this.getData = function getData() {
       return chainData(graphToList(buildGraph(win.location.hash)));

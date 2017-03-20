@@ -24,7 +24,7 @@ Well, why do people usually reinvent the wheel?
 1. To learn
 2. Because the wheel doesn't do something they need
 
-While learning was a nice side effect of having done this project, my main reason was that I couldn't find any routers that did what I _needed_. Granted, I didn't read the docs for all the 13,771 (as of this writing) other routers, but I read the docs for some of the top ones and couldn't find what I needed.
+While learning was a nice side effect of having done this project, my main reason was that I couldn't find any routers that did what I _needed_. Granted, I didn't read the docs for all 13,771 (as of this writing) other routers, but I read the docs for some of the top ones and couldn't find what I needed.
 
 What did I need?
 
@@ -78,7 +78,7 @@ Then, in your code, create the router and set it up like this:
 ```
 var Marbles = marbles.default; 
 var router = new Marbles({
-  // route definitions -- see below
+  // segment definitions -- see below
 });
 // The hashchange event doesn't fire on window load. Calling `step()` forces the hash route to be evaluated by Marbles.
 router.step();
@@ -86,13 +86,13 @@ router.step();
 router.start();
 ```
 
-### Specifying routes
+### Specifying segments
 
-You specify routes as an [adjacency list](https://en.wikipedia.org/wiki/Adjacency_list).
+You specify segments as an [adjacency list](https://en.wikipedia.org/wiki/Adjacency_list).
 
 #### Example
 ```
-var routes = {
+var segments = {
   // 'root' is REQUIRED
   'root': {
     // and it should always be active
@@ -151,7 +151,7 @@ var routes = {
 };
 ```
 
-The keys are **IDs**, and the nested objects are **segment configs**. That is, in example above, 'home' is the ID of the segment, and its config is 
+The keys are **IDs**, and the nested objects are **segment configs**. That is, in example above, 'home' is the ID of a segment, and its config is 
 
 ```
 {
@@ -211,21 +211,219 @@ Notice the use of the `data` object. You would almost never do this, so it's a c
 
 Marbles exposes an event-driven interface.
 
+### subscribe(subscriptions): Boolean
+
+This method can be used to subscribe to events. It returns true if the subscription was successful, or false otherwise.
+
+`subscriptions` should be an object of the following form:
+
+```
+{
+  <segment_id>: {
+    inserted: function(data) {
+      // do something
+    },
+    removed: function() {
+      // do something
+    }
+  }
+}
+```
+
+Both the `inserted` and `removed` keys are optional, though you should provide at least one for every segment to which you are subscribing (otherwise what's the point?). 
+
+The function registered under `inserted` is fired every time the segment under watch is inserted. It is passed a `data` object, which is a key-value map of all dynamic token data stored in the route _up to that segment_. 
+
+The function registered under `removed` is fired every time the segment under watch is removed. It is not passed anything.
+
+**Example**:
+
+```
+m.subscribe({
+  'user': {
+    // fired on .insert('user', ...) calls
+    inserted: function(data) {
+      console.log('Route for user #' + data.userId + ' activated!');
+      // note that data will have any other
+      // dynamic tokens from segments preceeding 'user' as well
+      someView.show();
+    },
+    // fired on .remove('user') calls
+    removed: function() {
+      console.log('User route deactivated.');
+      someView.hide();
+    }
+  }
+});
+```
+
+### unsubscribe(segmentId, event, handler): Boolean|Array
+
+Use this method to remove subscriptions. The parameters are as follows:
+* segmentId - ID of the segment whose listener you want to remove
+* event - Name of event whose listener want you to remove. Can be either 'inserted' or 'removed'.
+* handler - The handler function you provided in your `subscribe()` config.
+
+This method will return false if removal was unsuccessful (for example, if a bad parameter is passed), otherwise it will return an array of removed listeners.
+
+**Example:**
+
+```
+const handler = function doSomething(data) {
+  ...
+};
+// first, subscribe to an event
+m.subscribe({
+  'home': {
+    inserted: handler
+  }
+});
+// unsubscribe!
+m.unsubscribe('home', 'inserted', handler);
+```
+
+### step()
+
+**This method is chainable.**
+
+`step()` takes a snapshot of the current `window.location.hash` and fires any listeners that have been registered with `subscribe()`. The snapshot is recorded and is used as the previous state the next time `step()` is called. Note that internally, `start()` simply calls `step()` every time the `hashchange` event fires.
+
+Normally, you don't want to call `step()` directly, BUT you should **always call it once after router instantiation**. Why? So you can fire listeners for the initial state of the hash route, which isn't captured by `start()` because `hashchange` doesn't fire on page load.
+
+**Examples**:
+
+* On router instantiation:
+    
+    ```
+    const m = new Marbles(...);
+    m.subscribe(...); // add listeners
+    m.step(); // fire listeners for initial hash route.
+    m.start(); // listen for further hashchange events.
+    ```
+
+* Assume `window.location.hash` = `users/1/profile/details`, and also that there are listeners for every segment in the given hash. 
+
+    `step(); // fires listeners` 
+
+
+### start()
+
+**This method is chainable.**
+
+Listens for `hashchange` events and fires listeners added using `subscribe()` on said events. Unless you need fine-grained control of when your event listeners fire, you should always call this method when setting up Marbles, AFTER a single call to `step()`. 
+
+**Example**:
+
+```
+// instantiate marbles
+const m = new Marbles(...);
+// set up some listeners
+m.subscribe({
+  'home': {
+    inserted: () => {
+      console.log('Honey, I\'m home!');
+    }
+  }
+});
+// assume window.location.hash = ''
+// call step() to handle initial hashroute.
+m.step();
+// finally, call start() to listen for hashchange events.
+m.start();
+// assume window.location.hash changes to 'home'
+// "Honey, I'm home!"
+```
+
+### stop()
+
+**This method is chainable.**
+
+Stop Marbles from listening to `hashchange` events.
+
+**Example**:
+
+`m.stop();`
+
 ### insert(segmentId[, data])
 
 **This method is chainable.**
 
-When `insert()` is called, Marbles attempts to insert the given segment with the provided data into the hash route. Whether this is successful depends on the route configuration.
+When `insert()` is called, Marbles attempts to insert the given segment with the provided data into the hash route. Whether this is successful depends on the route configuration. 
 
-Examples: 
+**NOTE**: `insert()` only updates the hashroute.
+To ensure your listeners are fired, use `step()` or `start()`.
 
-Insert the 'home' segment.
+**Examples**: 
 
-`marbles.insert('home');`
+* Insert the 'home' segment:
+    
+    `m.insert('home');`
 
-Insert the 'user' segment, and pass it a `userId` of `1`. Assuming 'user' has the segment 'users/:userId', the dynamic token `:userId` will be replaced with `1`.
+* Insert the 'user' segment, and pass it a `userId` of `1`. Assuming 'user' has the segment 'users/:userId', the dynamic token `:userId` will be replaced with `1`.
+    
+    `m.insert('user', { userId: 1 });`
 
-`marbles.insert('user', { userId: 1 });`
+### remove(segmentId)
 
+**This method is chainable.**
 
-### remove()
+This method removes a segment from the hash route. This will update `window.location.hash` but will NOT fire any listeners by default. To fire the listeners, ensure you've already called `start()`, or call `step()` immediately after calling `remove()`.
+
+**Examples**: 
+
+* Remove the 'home' segment:
+
+    `m.remove('home');`
+
+* Remove the `user` segment. Notice that no data needs to be passed when _removing_ a segment.
+
+    `m.remove('user');
+
+### getData(): data
+
+Call this method to retrieve all the data from the dynamic tokens in the active hashroute.
+
+**Example**:
+
+Assume the hashroute is `users/1/cars/2/details` and Marbles is configured with the following segment definitions:
+
+```
+{
+  'root': {
+    active: true,
+    children: ['user'],    
+    data: {},
+    dependency: '',
+    segment: ''
+  },
+  'user': {
+    active: false,
+    children: ['car'],
+    data: {},
+    dependency: 'root',
+    segment: 'users/:userId'
+  },
+  'car': {
+    active: false,
+    children: ['car-details'],
+    data: {},
+    dependency: 'user',
+    segment: 'cars/:carId'
+  },
+  'car-details': {
+    active: false,
+    children: [],
+    data: {},
+    dependency: 'car',
+    segment: 'details'
+  }
+}
+```
+
+`m.getData(); // ->`
+```
+{
+  userId: 1,
+  carId: 2
+}
+```
