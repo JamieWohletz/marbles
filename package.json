@@ -1,6 +1,6 @@
 {
   "name": "marbles",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Client-side hierarchical routing library supporting optional views.",
   "main": "./src/marbles.js",
   "directories": {
