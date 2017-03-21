@@ -7,7 +7,7 @@
     "no-else-return": 0,
     "brace-style": [
       2,
-      "stroustrup"
+      "1tbs"
     ],
     "quote-props": [
       2,

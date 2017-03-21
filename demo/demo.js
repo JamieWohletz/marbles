@@ -155,16 +155,14 @@
   showInbox.addEventListener('click', () => {
     if (isHidden(messagesInbox)) {
       marble.insert('messages-inbox');
-    }
-    else {
+    } else {
       marble.remove('messages-inbox');
     }
   });
   showCompose.addEventListener('click', () => {
     if (isHidden(messagesCompose)) {
       marble.insert('messages-compose');
-    }
-    else {
+    } else {
       marble.remove('messages-compose');
     }
   });

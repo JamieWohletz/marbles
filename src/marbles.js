@@ -95,8 +95,7 @@ export default class Marbles {
           search.active = true;
           search.data = data;
           return true;
-        }
-        else if (currentId === searchId && !dependencyMet) {
+        } else if (currentId === searchId && !dependencyMet) {
           return false;
         }
         return curr.children.reduce(
@@ -248,8 +247,7 @@ export default class Marbles {
       let newGraph;
       if (insert) {
         newGraph = activateGraphNode(segmentId, dataToUse, graph);
-      }
-      else {
+      } else {
         newGraph = deactivateGraphNode(false, segmentId, graph);
       }
       win.location.hash = listToHashRoute(graphToList(newGraph));
