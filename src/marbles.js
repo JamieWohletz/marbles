@@ -109,6 +109,45 @@ function parseRoute(done, route, segments) {
   }(initialList, segmentIds));
 }
 
+function chainData(list, upToNode) {
+  const data = util.emptyObject();
+  const stop = util.isObject(upToNode) ? upToNode : { data: {} };
+  let next = list;
+  while (next && next !== stop) {
+    util.assign(data, next.data);
+    next = next.next;
+  }
+  return util.assign(data, stop.data);
+}
+
+function listDiff(from, against, diffData) {
+  return util.listReduce((arr, node) => {
+    const found = util.listHas({ id: node.id }, against);
+    if (!found || (diffData && !util.equal(found.data, node.data))) {
+      return arr.concat(node);
+    }
+    return arr;
+  }, [], from);
+}
+
+function handleActivations(newList, oldList, observers) {
+  const activated = listDiff(newList, oldList, true);
+  activated.forEach((listNode) => {
+    observers[listNode.id].activated.forEach((handler) => {
+      handler(chainData(newList, listNode));
+    });
+  });
+}
+
+function handleDeactivations(newList, oldList, observers) {
+  const deactivated = listDiff(oldList, newList, false);
+  deactivated.forEach(listNode => {
+    observers[listNode.id].deactivated.forEach(handler => {
+      handler();
+    });
+  });
+}
+
 export default class Marbles {
   constructor(segmentConfig, options) {
     const defaults = {
@@ -149,12 +188,22 @@ export default class Marbles {
     }
 
     this.segments = util.assign({}, defaultSegments, segmentConfig);
+    this.observers = util.keys(this.segments).reduce((obj, key) => {
+      obj[key] = {
+        activated: [],
+        deactivated: []
+      };
+      return obj;
+    }, {});
     this.linkedList = null;
   }
   // read the given route and fire activate and deactivate accordingly
   updateRoute(done, route) {
     parseRoute(list => {
-
+      handleActivations(list, this.linkedList, this.observers);
+      handleDeactivations(list, this.linkedList, this.observers);
+      this.linkedList = list;
+      done();
     }, route, this.segments);
   }
   // fire activated HERE

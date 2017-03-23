@@ -114,6 +114,20 @@ function listReduce(reducer, accumulator, list) {
   }(reducer, accumulator, list, 0));
 }
 
+function listHas(properties, list) {
+  if (!isObject(properties)) {
+    return false;
+  }
+  const propKeys = keys(properties);
+  return listReduce((bool, node) =>
+    bool || (propKeys.reduce((b, k) =>
+      b &&
+      typeof node[k] !== 'undefined' &&
+      deepEqual(node[k], properties[k])
+      , true))
+    , false, list);
+}
+
 function batchAsyncActions(fns, callback) {
   if (!isArray(fns)) {
     throw new TypeError(
@@ -144,6 +158,7 @@ export {
   listForEach,
   listMap,
   listReduce,
+  listHas,
   batchAsyncActions,
   noop,
   keys,

@@ -182,6 +182,36 @@ describe('util', () => {
       }));
     });
   });
+  describe('listHas()', () => {
+    it('should determine if a linked list has the item specified', () => {
+      const emptyList = null;
+      const fullList = {
+        id: 'one',
+        data: {
+          x: 1,
+          y: 2
+        },
+        next: {
+          id: 'two',
+          data: {
+            x: 5,
+            y: 2
+          },
+          next: {
+            id: 'three',
+            data: {
+              x: 8,
+              y: 3
+            },
+            next: null
+          }
+        }
+      };
+      assert.isFalse(util.listHas({ data: { x: 1, y: 2 } }, emptyList));
+      assert.isTrue(util.listHas({ data: { x: 1, y: 2 } }, fullList));
+      assert.isTrue(util.listHas({ id: 'three' }, fullList));
+    });
+  });
   describe('listForEach()', () => {
     it('should call a function for every item in a linked list', () => {
       const iterator = sinon.spy();
