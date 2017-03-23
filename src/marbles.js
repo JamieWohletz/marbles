@@ -1,319 +1,171 @@
-import * as util from './util.js';
+import * as util from './util';
+import * as logic from './logic';
+// core premise: route is a linked list which obeys the rules specified in the
+// initial configuration
+
+// with that in mind, what should the api be?
+
+/*
+constructor :: SegmentConfig -> Options -> Router
+activate :: SegmentId -> Data -> Null
+deactivate :: SegmentId -> Null
+subscribe({
+  'home': {
+    activated: f,
+    deactivated: f
+  }
+})
+updateRoute :: String
+start()
+stop()
+*/
+
+/*
+config = {
+  segmentId: {
+    fragment: string,
+    rule: Function(callback, segmentId, linkedList),
+    tokens: {
+      key: regex
+    }
+  }
+}
+*/
+
+function regexify(seg) {
+  const newSegment = seg.fragment.replace(/{([^}]+)}/g, (token) => {
+    return seg[token].source;
+  });
+  return new RegExp(newSegment);
+}
+
+function getSegments(routeFragment, segments) {
+  const ids = util.keys(segments);
+  if (!routeFragment) {
+    return null;
+  }
+  return ids.reduce((found, id) => {
+    if (routeFragment.search(regexify(segments[id])) !== -1) {
+      return found.concat(id);
+    }
+    return [];
+  }, []);
+}
+
+function matchingSegments(route, segments) {
+  const fragments = route
+    .split('/')
+    .reduce((arr, str) => arr.concat(str.length > 1 ? str : []), []);
+  let fragment = [];
+  let matching = [];
+  while (fragments.length > 0) {
+    fragment.push(fragments.unshift());
+    const foundSegments = getSegments(fragment.join('/'), segments);
+    if (foundSegments.length) {
+      fragment = [];
+    }
+    matching = matching.concat(foundSegments);
+  }
+  return matching;
+}
+
+function segmentToListNode(id, segments) {
+  return {
+    id,
+    segment: segments[id],
+    next: null
+  };
+}
+
+function listAppend(head, node) {
+  let next = head;
+  let last;
+  while (next) {
+    last = next;
+    next = next.next;
+  }
+  last.next = node;
+}
+
+function parseRoute(done, route, segments) {
+  if (!segments.root) {
+    done(null);
+  }
+  const initialList = segmentToListNode('root', segments);
+  const segmentIds = matchingSegments(route, segments);
+  (function buildList(head, ids) {
+    if (ids.length === 0) {
+      done(head);
+      return;
+    }
+    const id = ids[0];
+    const seg = segments[id];
+    seg.rule(ok => {
+      if (ok) {
+        listAppend(head, segmentToListNode(id));
+      }
+      buildList(head, ids.slice(1));
+    }, id, head);
+  }(initialList, segmentIds));
+}
 
 export default class Marbles {
-  constructor(routingGraph, win = window) {
-    const IMMUTABLE_GRAPH = routingGraph;
-    const DYNAMIC_SEGMENT_REGEX = /:[a-zA-Z]+(?=\/?)/;
-    const DIGIT_SEGMENT_REGEX = /\d+(?=\/?)/;
-    const observers = util.keys(IMMUTABLE_GRAPH).reduce((obj, key) => {
-      obj[key] = [];
-      return obj;
-    }, util.emptyObject());
-    const graphStack = [];
-
-    // Private methods
-    function expandSegment(segment, data) {
-      return segment.replace(
-        DYNAMIC_SEGMENT_REGEX,
-        segmentKey => data[segmentKey.replace(':', '')]
-      );
-    }
-
-    function extractSegmentData(templateSegment, segmentWithData) {
-      const dynamicSegments = templateSegment.match(
-        new RegExp(DYNAMIC_SEGMENT_REGEX.source, 'g')
-      ) || [];
-      return (segmentWithData.match(DIGIT_SEGMENT_REGEX) || []).reduce((data, value, index) => {
-        data[dynamicSegments[index].replace(':', '')] = value;
-        return util.assign(util.emptyObject(), data);
-      },
-        util.emptyObject()
-      );
-    }
-
-    function segmentToRegex(segment) {
-      // It just got weird
-      const regexed = segment.replace(
-        new RegExp(DYNAMIC_SEGMENT_REGEX.source, 'g'),
-        DIGIT_SEGMENT_REGEX.source
-      );
-      return new RegExp(regexed);
-    }
-
-    function findListNode(nodeId, list) {
-      let next = list;
-      while (next) {
-        if (next.id === nodeId) {
-          return next;
-        }
-        next = next.next;
+  constructor(segmentConfig, options) {
+    const defaults = {
+      leadingSlash: true,
+      trailingSlash: true
+    };
+    const defaultSegments = {
+      root: {
+        fragment: '',
+        rule: done => done(true),
       }
-      return null;
-    }
+    };
+    this.options = util.assign({}, defaults, options);
 
-    function chainData(list, upToNode) {
-      const data = util.emptyObject();
-      const stop = util.isObject(upToNode) ? upToNode : { data: {} };
-      let next = list;
-      while (next && next !== stop) {
-        util.assign(data, next.data);
-        next = next.next;
-      }
-      return util.assign(data, stop.data);
-    }
-
-    function graphNodeToListNode(id, graph) {
-      const graphNode = graph[id];
-      return util.assign(util.emptyObject(), graphNode, {
-        id,
-        segment: expandSegment(graphNode.segment, graphNode.data),
-        next: null,
-      });
-    }
-
-    function deactivateGraphNode(force, nodeId, immutableGraph) {
-      const graph = util.cloneDeep(immutableGraph);
-      function recDeactivate(target, current, g) {
-        const curr = g[current];
-        if (target === current || curr.dependency === target || force) {
-          curr.active = false;
-          curr.data = util.emptyObject();
-        }
-        curr.children.forEach(childId => recDeactivate(target, childId, g));
-      }
-      recDeactivate(nodeId, nodeId, graph);
-      return graph;
-    }
-
-    function activateGraphNode(nodeId, data, immutableGraph) {
-      const graph = util.cloneDeep(immutableGraph);
-      const parents = util.keys(graph).filter(key => graph[key].children.indexOf(nodeId) !== -1);
-      function dfsActivate(searchId, currentId, dependencyMet) {
-        const curr = graph[currentId];
-        const search = graph[searchId];
-        if (currentId === searchId && dependencyMet) {
-          search.active = true;
-          search.data = data;
-          return true;
-        } else if (currentId === searchId && !dependencyMet) {
-          return false;
-        }
-        return curr.children.reduce(
-          (depMet, childId) => dfsActivate(searchId, childId, depMet),
-          dependencyMet || currentId === search.dependency
+    function isValidSegment(seg) {
+      return util.isObject(seg)
+        && util.isString(seg.fragment)
+        && util.isFunction(seg.rule)
+        && seg.rule.length >= 1
+        && (
+          typeof seg.tokens === 'undefined' ||
+          util.isObject(seg.tokens)
         );
-      }
-
-      const activated = dfsActivate(nodeId, 'root', false);
-      if (activated) {
-        // deactivate immediate siblings
-        return parents.reduce((g, parentId) =>
-          g[parentId].children.filter(id => id !== nodeId).reduce((retG, childId) =>
-            deactivateGraphNode(true, childId, retG),
-            g),
-          graph);
-      }
-      return graph;
     }
 
-    function appendNode(node, head) {
-      const clonedHead = util.cloneDeep(head);
-      let next = clonedHead;
-      let last;
-      let dependencyMet = false;
-      while (next) {
-        dependencyMet = dependencyMet || next.id === node.dependency;
-        last = next;
-        next = next.next;
-      }
-      if (dependencyMet) {
-        last.next = util.cloneDeep(node);
-      }
-      return clonedHead;
+    function isValidConfig(conf) {
+      return util.isObject(conf)
+        && util.keys(conf).reduce((b, segId) => isValidSegment(conf[segId]), true);
     }
 
-    function parseHash(hashRoute, routeGraph) {
-      function recParse(hash, rootId, visitedNodes, graph) {
-        const root = graph[rootId];
-        return root.children.reduce((g, childId) => {
-          const child = graph[childId];
-          let newG = g;
-          const matches = hash.match(segmentToRegex(child.segment)) || [];
-          const substrIndex = matches.index ? matches.index + matches[0].length : 0;
-          if (visitedNodes[childId]) {
-            return newG;
-          }
-          visitedNodes[childId] = true;
-          if (matches.length > 0 && (graph[child.dependency] || util.emptyObject()).active) {
-            newG = activateGraphNode(
-              childId,
-              extractSegmentData(child.segment, util.arrayHead(matches)),
-              graph
-            );
-          }
-          return recParse(hash.substr(substrIndex), childId, visitedNodes, newG);
-        }, graph);
-      }
-      const newGraph = util.cloneDeep(routeGraph);
-      return recParse(hashRoute, 'root', {}, newGraph);
-    }
-
-    function buildGraph(hash) {
-      return parseHash(hash, IMMUTABLE_GRAPH);
-    }
-
-    function listToHashRoute(head) {
-      return util.listReduce((hash, node) => {
-        if (node.segment) {
-          return `${hash}${node.segment}/`;
-        }
-        return hash;
-      }, '#', head);
-    }
-
-    function graphToLinkedList(graph, rootId, listHead, visitedNodes) {
-      const root = graph[rootId];
-      const nextListNode = graphNodeToListNode(rootId, graph);
-      const newHead = root.active ? appendNode(nextListNode, listHead) : util.cloneDeep(listHead);
-
-      return root.children.reduce(
-        (head, childId) => {
-          if (visitedNodes[childId]) {
-            return head;
-          }
-          visitedNodes[childId] = true;
-          return graphToLinkedList(graph, childId, head, visitedNodes);
-        },
-        newHead
+    if (!isValidConfig(segmentConfig)) {
+      throw new Error(
+        `
+        Invalid segment configuration.
+        Please read the docs for details on proper segment configuration.
+        `
       );
     }
 
-    function logGraph(newGraph) {
-      const lastGraph = util.peek(graphStack);
-      if (!lastGraph || JSON.stringify(lastGraph) !== JSON.stringify(newGraph)) {
-        graphStack.push(newGraph);
-      }
-      return newGraph;
-    }
+    this.segments = util.assign({}, defaultSegments, segmentConfig);
+    this.linkedList = null;
+  }
+  // read the given route and fire activate and deactivate accordingly
+  updateRoute(done, route) {
+    parseRoute(list => {
 
-    function graphToList(graph) {
-      if (!graph) {
-        return null;
-      }
-      return graphToLinkedList(
-        graph,
-        'root',
-        graphNodeToListNode('root', graph),
-        util.emptyObject()
-      );
-    }
+    }, route, this.segments);
+  }
+  // fire activated HERE
+  activate(segmentId, data) {
 
-    function listDiff(from, against, includeUpdates) {
-      return util.listReduce((arr, node) => {
-        const found = findListNode(node.id, against);
-        if (!found || (includeUpdates && !util.equal(found.data, node.data))) {
-          return arr.concat(node);
-        }
-        return arr;
-      }, [], from);
-    }
+  }
+  // fire deactivated HERE
+  deactivate(segmentId) {
 
-    function notifyObservers(obsObj, oldGraph, newGraph) {
-      const oldListHead = graphToList(oldGraph);
-      const newListHead = graphToList(newGraph);
-      const removed = listDiff(oldListHead, newListHead, false);
-      const insertedNodes = listDiff(newListHead, oldListHead, true);
-      removed.forEach((node) => {
-        obsObj[node.id].forEach((obs) => {
-          obs.removed(chainData(oldListHead, node));
-        });
-      });
-      util.listForEach((node) => {
-        obsObj[node.id].forEach((obs) => {
-          obs.inserted(chainData(newListHead, node));
-        });
-      }, insertedNodes[0] || null);
-    }
+  }
+  subscribe(listenerObject) {
 
-    function insertOrRemove(insert, segmentId, data) {
-      let dataToUse = data;
-      if (!util.isString(segmentId) || !IMMUTABLE_GRAPH[segmentId]) {
-        return null;
-      }
-      if (data === null || typeof data !== 'object' || data instanceof Array) {
-        dataToUse = util.emptyObject();
-      }
-      const graph = buildGraph(win.location.hash);
-      let newGraph;
-      if (insert) {
-        newGraph = activateGraphNode(segmentId, dataToUse, graph);
-      } else {
-        newGraph = deactivateGraphNode(false, segmentId, graph);
-      }
-      win.location.hash = listToHashRoute(graphToList(newGraph));
-      return this;
-    }
-    // End private methods
-
-    // Public methods
-    this.subscribe = function subscribe(subscriptions) {
-      if (!util.isObject(subscriptions)) {
-        return false;
-      }
-      const matchingKeys = util.keys(subscriptions).filter(key => !!observers[key]);
-      if (matchingKeys.length === 0) {
-        return false;
-      }
-      matchingKeys.forEach(key => {
-        const sub = subscriptions[key];
-        observers[key].push({
-          inserted: sub.inserted || util.noop,
-          removed: sub.removed || util.noop,
-        });
-      });
-      return true;
-    };
-    this.unsubscribe = function unsubscribe(segmentId, event, handler) {
-      if (
-        !util.isString(segmentId) ||
-        !util.isString(event) ||
-        !util.isFunction(handler) ||
-        !observers[segmentId]
-      ) {
-        return false;
-      }
-      const matchingObservers = observers[segmentId].filter((obs) => obs[event] === handler);
-      return util.pull(matchingObservers, observers[segmentId]);
-    };
-    this.insert = function insert(segmentId, data) {
-      return insertOrRemove.call(this, true, segmentId, data);
-    };
-    this.remove = function remove(segmentId) {
-      return insertOrRemove.call(this, false, segmentId);
-    };
-    this.getData = function getData() {
-      return chainData(graphToList(buildGraph(win.location.hash)));
-    };
-    this.step = function step() {
-      const beginningState = win.location.hash;
-      const beginningGraph = buildGraph(beginningState);
-      notifyObservers(observers, graphStack.pop(), beginningGraph);
-      logGraph(beginningGraph);
-      const newState = win.location.hash;
-      const newGraph = buildGraph(newState);
-      win.history.replaceState(util.emptyObject(), '', listToHashRoute(graphToList(newGraph)));
-      return this;
-    };
-
-    const listener = this.step.bind(this);
-    this.start = function start() {
-      win.addEventListener('hashchange', listener);
-      return this;
-    };
-    this.stop = function stop() {
-      win.removeEventListener('hashchange', listener);
-      return this;
-    };
-    // End public methods
   }
 }

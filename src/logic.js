@@ -1,6 +1,6 @@
 import * as util from './util.js';
 
-function asyncBoolEval(anything, args, done) {
+function asyncBoolEval(done, anything, args) {
   if (util.isFunction(anything)) {
     anything.apply(null, [done].concat(args));
   } else {
@@ -9,8 +9,10 @@ function asyncBoolEval(anything, args, done) {
 }
 
 function not(argument) {
-  return function strictNot(...extraArgs) {
-    return !asyncBoolEval(argument, extraArgs);
+  return function strictNot(done, ...extraArgs) {
+    asyncBoolEval((b) => {
+      done(!b);
+    }, argument, extraArgs);
   };
 }
 
@@ -21,12 +23,29 @@ function or(...predicates) {
         callback(accumulator);
         return;
       }
-      asyncBoolEval(ps[0], extraArgs, asyncBoolFold.bind(null, callback, ps.slice(1)));
+      asyncBoolEval(asyncBoolFold.bind(null, callback, ps.slice(1)), ps[0], extraArgs);
     }(done, predicates, false));
+  };
+}
+
+function and(...predicates) {
+  return function strictAnd(done, ...extraArgs) {
+    if (predicates.length === 0) {
+      done(false);
+      return;
+    }
+    (function asyncBoolFold(callback, ps, accumulator) {
+      if (ps.length === 0 || !accumulator) {
+        callback(accumulator);
+        return;
+      }
+      asyncBoolEval(asyncBoolFold.bind(null, callback, ps.slice(1)), ps[0], extraArgs);
+    }(done, predicates, true));
   };
 }
 
 export {
   not,
-  or
+  or,
+  and
 };
