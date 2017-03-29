@@ -5,7 +5,7 @@ module.exports = {
   output: {
     path: join(__dirname, 'dist'),
     libraryTarget: 'umd',
-    library: 'marbles',
+    library: 'Marbles',
   },
   devtool: 'source-map',
   module: {

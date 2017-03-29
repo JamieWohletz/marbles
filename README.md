@@ -76,7 +76,6 @@ Download the [minified](https://github.com/JamieWohletz/marbles/blob/master/dist
 Then, in your code, create the router and set it up like this:
 
 ```
-var Marbles = marbles.default; 
 var router = new Marbles({
   // segment definitions -- see below
 });

@@ -4,9 +4,9 @@
 	else if(typeof define === 'function' && define.amd)
 		define([], factory);
 	else if(typeof exports === 'object')
-		exports["marbles"] = factory();
+		exports["Marbles"] = factory();
 	else
-		root["marbles"] = factory();
+		root["Marbles"] = factory();
 })(this, function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
@@ -56,10 +56,6 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	'use strict';
 	
-	Object.defineProperty(exports, "__esModule", {
-	  value: true
-	});
-	
 	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
 	
 	var _util = __webpack_require__(1);
@@ -70,7 +66,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 	
-	var Marbles = function Marbles(routingGraph) {
+	module.exports = function Marbles(routingGraph) {
 	  var win = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : window;
 	
 	  _classCallCheck(this, Marbles);
@@ -373,8 +369,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	  };
 	  // End public methods
 	};
-	
-	exports.default = Marbles;
 
 /***/ },
 /* 1 */
