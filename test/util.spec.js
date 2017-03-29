@@ -212,6 +212,43 @@ describe('util', () => {
       assert.isTrue(util.listHas({ id: 'three' }, fullList));
     });
   });
+  describe('listLength()', () => {
+    it('should return a list\'s length', () => {
+      const list = {
+        data: 1,
+        next: {
+          data: 2,
+          next: {
+            data: 3,
+            next: null
+          }
+        }
+      };
+      assert.equal(util.listLength(list), 3);
+    });
+  });
+  describe('listSlice()', () => {
+    it('should return a copy of a portion of a list', () => {
+      const list = {
+        data: 1,
+        next: {
+          data: 2,
+          next: {
+            data: 3,
+            next: null
+          }
+        }
+      };
+      assert.deepEqual(util.listSlice(1, 3, list), {
+        data: 2,
+        next: {
+          data: 3,
+          next: null
+        }
+      });
+      assert.deepEqual(util.listSlice(0, 0, null), null);
+    });
+  });
   describe('listForEach()', () => {
     it('should call a function for every item in a linked list', () => {
       const iterator = sinon.spy();

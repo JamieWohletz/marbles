@@ -198,7 +198,7 @@ export default class Marbles {
     this.linkedList = null;
   }
   // read the given route and fire activate and deactivate accordingly
-  updateRoute(done, route) {
+  updateRoute(done, route = window.location.hash) {
     parseRoute(list => {
       handleActivations(list, this.linkedList, this.observers);
       handleDeactivations(list, this.linkedList, this.observers);
@@ -207,8 +207,29 @@ export default class Marbles {
     }, route, this.segments);
   }
   // fire activated HERE
-  activate(segmentId, data) {
-
+  activate(done, segmentId, data) {
+    if (!this.linkedList) {
+      return;
+    }
+    const segment = this.segments[segmentId];
+    const rule = segment.rule;
+    const len = util.listLength(this.linkedList);
+    (function checkRule(head) {
+      if (!head) {
+        return;
+      }
+      rule((ok) => {
+        if (!ok) {
+          checkRule(util.listSlice(0, util.listLength(head) - 1));
+        } else {
+          listAppend(head, segmentToListNode('segmentId', this.segments));
+          listAppend(
+            head,
+            util.listSlice(util.listLength(head) - 1, len, this.linkedList)
+          );
+        }
+      }, segmentId, head);
+    }(this.linkedList));
   }
   // fire deactivated HERE
   deactivate(segmentId) {

@@ -114,6 +114,29 @@ function listReduce(reducer, accumulator, list) {
   }(reducer, accumulator, list, 0));
 }
 
+function listLength(list) {
+  return listReduce((count) => count + 1, 0, list);
+}
+
+function listSlice(begin, end, head) {
+  assertList(head);
+  let newHead = cloneDeep(head);
+  let i = 0;
+  while (newHead && i < begin) {
+    newHead = newHead.next;
+    i++;
+  }
+  let last = newHead;
+  while (last && i < end) {
+    last = newHead.next;
+    i++;
+  }
+  if (last) {
+    last.next = null;
+  }
+  return newHead;
+}
+
 function listHas(properties, list) {
   if (!isObject(properties)) {
     return false;
@@ -155,9 +178,11 @@ export {
   isFunction,
   isString,
   isList,
+  listSlice,
   listForEach,
   listMap,
   listReduce,
+  listLength,
   listHas,
   batchAsyncActions,
   noop,
