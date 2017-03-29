@@ -1,6 +1,5 @@
-/* global marbles */
+/* global Marbles */
 (function demo() {
-  const Marbles = marbles.default;
   const routes = {
     'root': {
       active: true,

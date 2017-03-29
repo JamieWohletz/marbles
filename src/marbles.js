@@ -1,6 +1,6 @@
 import * as util from './util.js';
 
-export default class Marbles {
+module.exports = class Marbles {
   constructor(routingGraph, win = window) {
     const IMMUTABLE_GRAPH = routingGraph;
     const DYNAMIC_SEGMENT_REGEX = /:[a-zA-Z]+(?=\/?)/;
