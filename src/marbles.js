@@ -69,14 +69,16 @@ function matchingSegments(route, segments) {
   return matching;
 }
 
-function segmentToListNode(id, segments) {
+function segmentToListNode(id, segments, data = {}) {
   return {
     id,
     segment: segments[id],
+    data,
     next: null
   };
 }
 
+// MUTATES HEAD
 function listAppend(head, node) {
   let next = head;
   let last;
@@ -85,28 +87,27 @@ function listAppend(head, node) {
     next = next.next;
   }
   last.next = node;
+  return head;
 }
 
-function parseRoute(done, route, segments) {
+function parseHash(route, segments) {
   if (!segments.root) {
-    done(null);
+    return null;
   }
   const initialList = segmentToListNode('root', segments);
   const segmentIds = matchingSegments(route, segments);
-  (function buildList(head, ids) {
-    if (ids.length === 0) {
-      done(head);
-      return;
-    }
-    const id = ids[0];
-    const seg = segments[id];
-    seg.rule(ok => {
-      if (ok) {
-        listAppend(head, segmentToListNode(id));
-      }
-      buildList(head, ids.slice(1));
-    }, id, head);
-  }(initialList, segmentIds));
+  return segmentIds.reduce((head, id) => {
+    const ok = segments[id].rule(id, head)();
+    return ok ? listAppend(head, segmentToListNode(id, segments)) : head;
+  }, initialList);
+}
+
+function listToHash(list, leadingSlash, trailingSlash) {
+  const mempty = leadingSlash ? '/' : '';
+  const hash = util.listReduce((str, node) => {
+    // TODO
+    return replaceStuff;
+  }, mempty, list);
 }
 
 function chainData(list, upToNode) {
@@ -148,9 +149,42 @@ function handleDeactivations(newList, oldList, observers) {
   });
 }
 
+function isValidSegment(seg) {
+  return util.isObject(seg)
+    && util.isString(seg.fragment)
+    && util.isFunction(seg.rule)
+    && seg.rule.length >= 1
+    && (
+      typeof seg.tokens === 'undefined' ||
+      util.isObject(seg.tokens)
+    );
+}
+
+function isValidConfig(conf) {
+  return util.isObject(conf)
+    && util.keys(conf).reduce((b, segId) => isValidSegment(conf[segId]), true);
+}
+
+function assertOptionsOk(options) {
+  if (options && !util.isObject(options)) {
+    throw new Error('Invalid options. Please read the docs for details.');
+  }
+}
+
+function assertSegmentConfigOk(segmentConfig) {
+  if (!isValidConfig(segmentConfig)) {
+    throw new Error(
+      `
+        Invalid segment configuration.
+        Please read the docs for details on proper segment configuration.
+        `
+    );
+  }
+}
+
 export default class Marbles {
-  constructor(segmentConfig, options) {
-    const defaults = {
+  constructor(segmentConfig, options = {}, win = window) {
+    const defaultOptions = {
       leadingSlash: true,
       trailingSlash: true
     };
@@ -160,76 +194,49 @@ export default class Marbles {
         rule: done => done(true),
       }
     };
-    this.options = util.assign({}, defaults, options);
 
-    function isValidSegment(seg) {
-      return util.isObject(seg)
-        && util.isString(seg.fragment)
-        && util.isFunction(seg.rule)
-        && seg.rule.length >= 1
-        && (
-          typeof seg.tokens === 'undefined' ||
-          util.isObject(seg.tokens)
-        );
-    }
-
-    function isValidConfig(conf) {
-      return util.isObject(conf)
-        && util.keys(conf).reduce((b, segId) => isValidSegment(conf[segId]), true);
-    }
-
-    if (!isValidConfig(segmentConfig)) {
-      throw new Error(
-        `
-        Invalid segment configuration.
-        Please read the docs for details on proper segment configuration.
-        `
-      );
-    }
-
-    this.segments = util.assign({}, defaultSegments, segmentConfig);
-    this.observers = util.keys(this.segments).reduce((obj, key) => {
+    assertSegmentConfigOk(segmentConfig);
+    assertOptionsOk(options);
+    this.options = util.assign({}, defaultOptions, options);
+    this.segments = Object.freezez(util.assign({}, defaultSegments, segmentConfig));
+    this.observers = Object.freeze(util.keys(this.segments).reduce((obj, key) => {
       obj[key] = {
         activated: [],
         deactivated: []
       };
       return obj;
-    }, {});
+    }, {}));
     this.linkedList = null;
   }
   // read the given route and fire activate and deactivate accordingly
-  updateRoute(done, route = window.location.hash) {
-    parseRoute(list => {
-      handleActivations(list, this.linkedList, this.observers);
-      handleDeactivations(list, this.linkedList, this.observers);
-      this.linkedList = list;
-      done();
-    }, route, this.segments);
+  setHashRoute(hash = this.win.location.hash) {
+    const route = hash.replace('#', '');
+    const list = parseHash(route, this.segments);
+    handleActivations(list, this.linkedList, this.observers);
+    handleDeactivations(list, this.linkedList, this.observers);
+    this.linkedList = list;
+    this.win.location.hash = listToHash(this.linkedList);
   }
   // fire activated HERE
-  activate(done, segmentId, data) {
+  activate(segmentId, data) {
     if (!this.linkedList) {
       return;
     }
     const segment = this.segments[segmentId];
     const rule = segment.rule;
     const len = util.listLength(this.linkedList);
-    (function checkRule(head) {
-      if (!head) {
-        return;
-      }
-      rule((ok) => {
-        if (!ok) {
-          checkRule(util.listSlice(0, util.listLength(head) - 1));
-        } else {
-          listAppend(head, segmentToListNode('segmentId', this.segments));
-          listAppend(
-            head,
-            util.listSlice(util.listLength(head) - 1, len, this.linkedList)
-          );
-        }
-      }, segmentId, head);
-    }(this.linkedList));
+    let ok = false;
+    let head = this.linkedList;
+    while (!ok && util.listLength(head) > 0) {
+      ok = rule(segmentId, head);
+      head = util.listSlice(0, util.listLength(head) - 2);
+    }
+    listAppend(head, segmentToListNode(segmentId, this.segments, data));
+    listAppend(
+      head,
+      util.listSlice(util.listLength(head) - 1, len, this.linkedList)
+    );
+    this.setHashRoute(listToHash(head, this.options.leadingSlash, this.options.trailingSlash));
   }
   // fire deactivated HERE
   deactivate(segmentId) {

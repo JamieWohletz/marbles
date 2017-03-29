@@ -1,46 +1,38 @@
 import * as util from './util.js';
 
-function asyncBoolEval(done, anything, args) {
+function boolEval(anything, args) {
   if (util.isFunction(anything)) {
-    anything.apply(null, [done].concat(args));
+    return anything.apply(null, args);
   } else {
-    done(Boolean(anything));
+    return Boolean(anything);
   }
 }
 
 function not(argument) {
-  return function strictNot(done, ...extraArgs) {
-    asyncBoolEval((b) => {
-      done(!b);
-    }, argument, extraArgs);
+  return function strictNot(...extraArgs) {
+    return !boolEval(argument, extraArgs);
   };
 }
 
 function or(...predicates) {
-  return function strictOr(done, ...extraArgs) {
-    (function asyncBoolFold(callback, ps, accumulator) {
-      if (ps.length === 0 || accumulator) {
-        callback(accumulator);
-        return;
+  return function strictOr(...extraArgs) {
+    for (let i = 0; i < predicates.length; i++) {
+      if (boolEval(predicates[i], extraArgs)) {
+        return true;
       }
-      asyncBoolEval(asyncBoolFold.bind(null, callback, ps.slice(1)), ps[0], extraArgs);
-    }(done, predicates, false));
+    }
+    return false;
   };
 }
 
 function and(...predicates) {
-  return function strictAnd(done, ...extraArgs) {
-    if (predicates.length === 0) {
-      done(false);
-      return;
-    }
-    (function asyncBoolFold(callback, ps, accumulator) {
-      if (ps.length === 0 || !accumulator) {
-        callback(accumulator);
-        return;
+  return function strictAnd(...extraArgs) {
+    for (let i = 0; i < predicates.length; i++) {
+      if (!boolEval(predicates[i], extraArgs)) {
+        return false;
       }
-      asyncBoolEval(asyncBoolFold.bind(null, callback, ps.slice(1)), ps[0], extraArgs);
-    }(done, predicates, true));
+    }
+    return predicates.length > 0;
   };
 }
 

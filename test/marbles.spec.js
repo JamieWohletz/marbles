@@ -1,8 +1,8 @@
 // /* eslint-env mocha */
-// import Marbles from '../src/marbles';
-// import { assert } from 'chai';
-// import mockBrowser from 'mock-browser';
-// import sinon from 'sinon';
+import Marbles from '../src/marbles';
+import { assert } from 'chai';
+import mockBrowser from 'mock-browser';
+import sinon from 'sinon';
 // const routes = {
 //   'root': {
 //     active: true,
