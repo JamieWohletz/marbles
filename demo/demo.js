@@ -134,7 +134,7 @@
       inserted: (data) => {
         show(messagesInbox);
         show(messagesDetail);
-        document.querySelectorAll('.email-details').forEach(el => {
+        document.querySelectorAll('.email-details').forEach((el) => {
           hide(el);
         });
         show(document.getElementById(`details-${data.messageId}`));

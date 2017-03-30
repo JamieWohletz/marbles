@@ -79,7 +79,12 @@ function isList(listish) {
 
 function assertList(list) {
   if (!isList(list)) {
-    throw new TypeError('listForEach requires a list! Lists are objects with a `next` property.');
+    throw new TypeError(
+      `
+      Linked list required! A linked list is null or an object with a 'next' property.
+      You passed ${list}
+      `
+    );
   }
 }
 
@@ -137,18 +142,23 @@ function listSlice(begin, end, head) {
   return newHead;
 }
 
-function listHas(properties, list) {
+function findListNode(properties, list) {
   if (!isObject(properties)) {
-    return false;
+    return null;
   }
   const propKeys = keys(properties);
-  return listReduce((bool, node) =>
-    bool || (propKeys.reduce((b, k) =>
-      b &&
-      typeof node[k] !== 'undefined' &&
-      deepEqual(node[k], properties[k])
-      , true))
-    , false, list);
+  return listReduce((found, node) => {
+    const matches = propKeys.reduce((b, k) => {
+      return b &&
+        typeof node[k] !== 'undefined' &&
+        deepEqual(node[k], properties[k]);
+    }, true);
+    return found || (matches ? node : null);
+  }, null, list);
+}
+
+function listHas(properties, list) {
+  return findListNode(properties, list) !== null;
 }
 
 function batchAsyncActions(fns, callback) {
@@ -183,6 +193,7 @@ export {
   listMap,
   listReduce,
   listLength,
+  findListNode,
   listHas,
   batchAsyncActions,
   noop,

@@ -1,5 +1,6 @@
 // /* eslint-env mocha */
 import Marbles from '../src/marbles';
+import logic from '../src/logic';
 import { assert } from 'chai';
 import mockBrowser from 'mock-browser';
 import sinon from 'sinon';
@@ -68,10 +69,221 @@ import sinon from 'sinon';
 // let marbles;
 // let win;
 
+// const segments = {
+//   'home': {
+//     fragment: 'home',
+//     rule: present('root')
+//   },
+//   'user': {
+
+//   },
+//   'search': {
+
+//   }
+// };
+
+let marbles;
+let win;
 // beforeEach(() => {
-//   win = mockBrowser.mocks.MockBrowser.createWindow();
-//   marbles = new Marbles(routes, win);
+//   win = mockBrowser.mocks.mockBrowser.createWindow();
+//   marbles = new Marbles({
+
+//   })
 // });
+
+beforeEach(() => {
+  win = mockBrowser.mocks.MockBrowser.createWindow();
+});
+
+describe('Marbles', () => {
+  it('exposes the logic module', () => {
+    assert.isObject(Marbles.logic);
+    assert.property(Marbles.logic, 'or');
+    assert.property(Marbles.logic, 'and');
+    assert.property(Marbles.logic, 'not');
+  });
+  describe('static methods', () => {
+    describe('present()', () => {
+      it('should check if a segment is present in a linked list', () => {
+        assert.isTrue(Marbles.present('root')('', {
+          id: 'root',
+          next: null
+        }));
+        assert.isFalse(Marbles.present('about')('', {
+          id: 'root',
+          next: {
+            id: 'home',
+            next: null
+          }
+        }));
+      });
+    });
+    describe('parent()', () => {
+      it('should check if a one segment is a direct parent of another in a linked list', () => {
+        assert.isTrue(Marbles.parent('root')('home', {
+          id: 'root',
+          next: {
+            id: 'home',
+            next: null
+          }
+        }));
+        assert.isFalse(Marbles.parent('root')('about', {
+          id: 'root',
+          next: {
+            id: 'home',
+            next: {
+              id: 'about',
+              next: null
+            }
+          }
+        }));
+      });
+    });
+  });
+  describe('constructor()', () => {
+    it('should accept valid segment configs', () => {
+      const valid = {
+        'home': {
+          fragment: 'home',
+          rule: () => true
+        },
+        'about-with-a-dash-for-eslint': {
+          fragment: 'about',
+          rule: () => false
+        }
+      };
+      assert.doesNotThrow(() => new Marbles(valid, {}, win));
+    });
+    it('should error for invalid segment configs', () => {
+      const invalid = {
+        'utterly-incorrect': {
+          rule: 325
+        }
+      };
+      assert.throws(() => new Marbles(invalid, {}, win), Error);
+    });
+    it('should accept valid options', () => {
+      const segments = {
+        'home': {
+          fragment: 'home',
+          rule: () => true
+        },
+        'about-with-a-dash-for-eslint': {
+          fragment: 'about',
+          rule: () => false
+        }
+      };
+      assert.doesNotThrow(() => new Marbles(segments, {}, win));
+    });
+    it('should error for invalid options', () => {
+      const segments = {
+        'home': {
+          fragment: 'home',
+          rule: () => true
+        },
+        'about-with-a-dash-for-eslint': {
+          fragment: 'about',
+          rule: () => false
+        }
+      };
+      assert.throws(() => new Marbles(segments, 532, win));
+    });
+  });
+  describe('instance methods', () => {
+    describe('processRoute()', () => {
+      it('should construct a linked list which obeys rules', () => {
+        const t = () => true;
+        const f = () => false;
+        const m = new Marbles({
+          'home': {
+            fragment: 'home',
+            rule: t
+          },
+          'about': {
+            fragment: 'about',
+            rule: t
+          },
+          'never-visible': {
+            fragment: 'never-ever-ever',
+            rule: f
+          }
+        }, {}, win);
+        m.processRoute('#home/about/never-visible');
+        const list = m.linkedList;
+        function checkNode(id, fragment, node) {
+          assert.equal(node.id, id);
+          assert.equal(node.segment.fragment, fragment);
+          assert.isFunction(node.segment.rule);
+          assert.deepEqual(node.segment.tokens, {});
+          assert.deepEqual(node.segment.tokenData, {});
+        }
+        checkNode('root', '', list);
+        checkNode('home', 'home', list.next);
+        checkNode('about', 'about', list.next.next);
+        assert.isNull(list.next.next.next);
+      });
+      it('should return a hash route based on rules', () => {
+        const t = () => true;
+        const f = () => false;
+        const m = new Marbles({
+          'home': {
+            fragment: 'home',
+            rule: t
+          },
+          'about': {
+            fragment: 'about',
+            rule: t
+          },
+          'never-visible': {
+            fragment: 'never-ever-ever',
+            rule: f
+          }
+        }, {}, win);
+        assert.equal(m.processRoute('#home/about/never-visible'), '/home/about/');
+        assert.equal(m.processRoute('/home/about/'), '/home/about/');
+      });
+      it('should obey options', () => {
+        const t = () => true;
+        const f = () => false;
+        const m = new Marbles({
+          'home': {
+            fragment: 'home',
+            rule: t
+          },
+          'about': {
+            fragment: 'about',
+            rule: t
+          },
+          'never-visible': {
+            fragment: 'never-ever-ever',
+            rule: f
+          }
+        }, {
+          trailingSlash: false,
+          leadingSlash: false
+        }, win);
+        assert.equal(m.processRoute('#home/about/never-visible'), 'home/about');
+        assert.equal(m.processRoute('home/about'), 'home/about');
+      });
+    });
+    describe('activate()', () => {
+      it('should add a new segment into the route if allowed by its rule', () => {
+        const m = new Marbles({
+          home: {
+            fragment: 'home',
+            rule: () => true
+          },
+          about: {
+            fragment: 'about',
+            rule: Marbles.logic.and(Marbles.present('root'), Marbles.parent('home'))
+          }
+        }, {}, win);
+        m.processRoute('#home');
+        assert.equal(m.activate('about', {}), '/home/about/');
+      });
+    });
+  });
+});
 
 // describe('Marbles', () => {
 //   describe('constructor()', () => {

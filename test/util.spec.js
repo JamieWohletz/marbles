@@ -182,6 +182,45 @@ describe('util', () => {
       }));
     });
   });
+  describe('findListNode()', () => {
+    it('should find a list node based on properties provided', () => {
+      const emptyList = null;
+      const fullList = {
+        id: 'one',
+        data: {
+          x: 1,
+          y: 2
+        },
+        next: {
+          id: 'two',
+          data: {
+            x: 5,
+            y: 2
+          },
+          next: {
+            id: 'three',
+            data: {
+              x: 8,
+              y: 3
+            },
+            next: null
+          }
+        }
+      };
+      assert.isNull(util.findListNode({}, emptyList));
+      assert.deepEqual(
+        util.findListNode({ id: 'three' }, fullList),
+        {
+          id: 'three',
+          data: {
+            x: 8,
+            y: 3
+          },
+          next: null
+        }
+      );
+    });
+  });
   describe('listHas()', () => {
     it('should determine if a linked list has the item specified', () => {
       const emptyList = null;
@@ -247,6 +286,13 @@ describe('util', () => {
         }
       });
       assert.deepEqual(util.listSlice(0, 0, null), null);
+      assert.deepEqual(util.listSlice(0, 2, list), {
+        data: 1,
+        next: {
+          data: 2,
+          next: null
+        }
+      });
     });
   });
   describe('listForEach()', () => {
