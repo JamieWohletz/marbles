@@ -32,18 +32,34 @@ config = {
 }
 */
 const TOKEN_REGEX = /{([^}]+)}/g;
+const DIGIT_REGEX = /\d+/;
+
+function rootSegment() {
+  return {
+    fragment: '',
+    tokens: {},
+    tokenData: {},
+    rule: () => true
+  };
+}
+
+function newList() {
+  return {
+    id: 'root',
+    segment: rootSegment(),
+    next: null
+  };
+}
 
 function regexify(seg) {
   const newSegment = seg.fragment.replace(TOKEN_REGEX, (token) => {
     return seg.tokens[token].source;
   });
-  console.log('regexified: ', new RegExp(newSegment));
   return new RegExp(newSegment);
 }
 
 function getSegments(routeFragment, segments) {
   const ids = util.keys(segments).filter((id) => id !== 'root');
-  console.log('searching for ', routeFragment);
   if (!routeFragment) {
     return null;
   }
@@ -69,48 +85,36 @@ function matchingSegments(route, segments) {
     }
     matching = matching.concat(foundSegments);
   }
-  console.log('matching fragments: ', matching);
   return matching;
 }
 
 function segmentToListNode(id, segments, data = {}) {
+  const normalizedSegment = util.assign(
+    {
+      tokens: {}
+    },
+    segments[id],
+    {
+      tokenData: data
+    }
+  );
   return {
     id,
-    segment: util.assign(
-      {
-        tokens: {}
-      },
-      segments[id],
-      {
-        tokenData: data
-      }
-    ),
+    segment: normalizedSegment,
     next: null
   };
-}
-
-// MUTATES HEAD
-function listAppend(list, node) {
-  const head = util.listSlice(0, util.listLength(list), list);
-  let next = head;
-  let last;
-  while (next) {
-    last = next;
-    next = next.next;
-  }
-  last.next = node;
-  return head;
 }
 
 function routeToList(route, segments) {
   if (!segments.root) {
     return null;
   }
-  const initialList = segmentToListNode('root', segments);
+  const initialList = newList();
   const segmentIds = matchingSegments(route, segments);
   return segmentIds.reduce((head, id) => {
-    const ok = segments[id].rule(id, head);
-    return ok ? listAppend(head, segmentToListNode(id, segments)) : head;
+    const newHead = util.listAppend(head, segmentToListNode(id, segments, {}));
+    const ok = segments[id].rule(id, newHead);
+    return ok ? newHead : head;
   }, initialList);
 }
 
@@ -121,16 +125,16 @@ function replaceTokens(string, data) {
   return string.replace(TOKEN_REGEX, (match) => stripBraces(data[match]));
 }
 
-function listToRoute({ next }, leadingSlash, trailingSlash) {
+function listToRoute(head, leadingSlash, trailingSlash) {
   const fragments = util.listReduce(
     (array, { segment: { fragment, tokenData } }) => {
-      return array.concat(replaceTokens(fragment, tokenData));
+      return fragment ? array.concat(replaceTokens(fragment, tokenData)) : array;
     },
     [],
-    next
+    head
   );
   const hash = fragments.join('/');
-  return `${leadingSlash ? '/' : ''}${hash}${trailingSlash ? '/' : ''}`;
+  return hash ? `${leadingSlash ? '/' : ''}${hash}${trailingSlash ? '/' : ''}` : hash;
 }
 
 function chainData(list, upToNode) {
@@ -211,10 +215,7 @@ export default class Marbles {
       trailingSlash: true
     };
     const defaultSegments = {
-      root: {
-        fragment: '',
-        rule: (done) => done(true),
-      }
+      root: rootSegment()
     };
 
     assertSegmentConfigOk(segmentConfig);
@@ -233,6 +234,11 @@ export default class Marbles {
   }
   static get logic() {
     return logic;
+  }
+  static get Regex() {
+    return {
+      DIGITS: DIGIT_REGEX
+    };
   }
   static present(requiredSegmentId) {
     return (segmentId, linkedList) =>
@@ -255,39 +261,34 @@ export default class Marbles {
     handleActivations(list, this.linkedList, this.observers);
     handleDeactivations(list, this.linkedList, this.observers);
     this.linkedList = list;
-    return listToRoute(
+    const newRoute = listToRoute(
       this.linkedList,
       this.options.leadingSlash,
       this.options.trailingSlash
     );
+    this.win.location.hash = newRoute;
+    return newRoute;
   }
   // fire activated HERE
   activate(segmentId, data) {
-    if (!this.linkedList) {
-      return '';
-    }
     const segment = this.segments[segmentId];
-    const segNode = segmentToListNode(segmentId, this.segments);
+    const segNode = segmentToListNode(segmentId, this.segments, data);
     const rule = segment.rule;
     const len = util.listLength(this.linkedList);
-    let ok = false;
+    let finished = false;
     let head = this.linkedList;
-    // BROKEN: this function does not account for the case
-    // where the segment being activated is already in the route
-    // it also does not handle appension correctly because
-    // listAppend mutates the input list. Fix listAppend first
-
-    // listAppend fixed
-    while (!ok && util.listLength(head) > 0) {
-      ok = rule(segmentId, listAppend(head, segNode));
-      console.log('rule ', ok);
+    while (!finished) {
+      finished = rule(segmentId, util.listAppend(head, segNode)) || util.listLength(head) === 0;
       head = util.listSlice(0, util.listLength(head) - 1, head);
     }
-    listAppend(
+    head = util.listAppend(head, segNode);
+    console.log('activate: intermediate list = ', head);
+    console.log('to append: ', util.listSlice(util.listLength(head) - 1, len, this.linkedList));
+    head = util.listAppend(
       head,
       util.listSlice(util.listLength(head) - 1, len, this.linkedList)
     );
-    console.log('route: ', listToRoute(head, this.options.leadingSlash, this.options.trailingSlash));
+    console.log('activate: final list = ', head);
     return this.processRoute(
       listToRoute(head, this.options.leadingSlash, this.options.trailingSlash)
     );

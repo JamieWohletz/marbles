@@ -1,4 +1,5 @@
 const deepEqual = require('deep-equal');
+const cloneDeep = require('clone-deep');
 
 function emptyObject() {
   return Object.create(null);
@@ -24,12 +25,8 @@ function keys(obj) {
   return Object.keys(obj);
 }
 
-function cloneDeep(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
-
 function assign(...args) {
-  return Object.assign.apply(this, args);
+  return Object.assign.apply(Object, args);
 }
 
 function arrayHead(array) {
@@ -123,23 +120,46 @@ function listLength(list) {
   return listReduce((count) => count + 1, 0, list);
 }
 
+function listLast(list) {
+  let next = list;
+  let last = list;
+  while (next) {
+    last = next;
+    next = next.next;
+  }
+  return last;
+}
+
+function listAt(index, list) {
+  let next = list;
+  let i = 0;
+  while (next && i !== index) {
+    next = next.next;
+    i += 1;
+  }
+  return next;
+}
+
 function listSlice(begin, end, head) {
   assertList(head);
-  let newHead = cloneDeep(head);
-  let i = 0;
-  while (newHead && i < begin) {
-    newHead = newHead.next;
-    i++;
+  const newHead = cloneDeep(head);
+  const start = listAt(begin, newHead);
+  const last = listAt(end - 1, newHead);
+  if (!last) {
+    return null;
   }
-  let last = newHead;
-  while (last && i < end) {
-    last = newHead.next;
-    i++;
+  last.next = null;
+  return start;
+}
+
+function listAppend(list, node) {
+  if (list === null) {
+    return null;
   }
-  if (last) {
-    last.next = null;
-  }
-  return newHead;
+  const head = listSlice(0, listLength(list), list);
+  const last = listLast(head);
+  last.next = node;
+  return head;
 }
 
 function findListNode(properties, list) {
@@ -188,6 +208,8 @@ export {
   isFunction,
   isString,
   isList,
+  listAt,
+  listLast,
   listSlice,
   listForEach,
   listMap,
@@ -195,6 +217,7 @@ export {
   listLength,
   findListNode,
   listHas,
+  listAppend,
   batchAsyncActions,
   noop,
   keys,

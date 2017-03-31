@@ -77,11 +77,13 @@ describe('util', () => {
   });
   describe('cloneDeep()', () => {
     it('should clone a non-circular object, excluding its prototype', () => {
-      const objToClone = {
-        one: 1,
-        two: 2,
-        three: 3
-      };
+      const objToClone = Object.create({
+        four: 4,
+        five: 5
+      });
+      objToClone.one = 1;
+      objToClone.two = 2;
+      objToClone.three = 3;
       const cloned = util.cloneDeep(objToClone);
       assert.propertyVal(cloned, 'one', 1);
       assert.propertyVal(cloned, 'two', 2);
@@ -103,7 +105,7 @@ describe('util', () => {
     it('should error on a circular object', () => {
       const objToClone = {};
       objToClone.circular = objToClone;
-      assert.throws(util.cloneDeep.bind(null, objToClone), TypeError);
+      assert.throws(util.cloneDeep.bind(null, objToClone), RangeError);
     });
   });
   describe('assign()', () => {
@@ -221,6 +223,42 @@ describe('util', () => {
       );
     });
   });
+  describe('listAt()', () => {
+    it('should get the node at the specified index', () => {
+      const emptyList = null;
+      const fullList = {
+        id: 'one',
+        data: {
+          x: 1,
+          y: 2
+        },
+        next: {
+          id: 'two',
+          data: {
+            x: 5,
+            y: 2
+          },
+          next: {
+            id: 'three',
+            data: {
+              x: 8,
+              y: 3
+            },
+            next: null
+          }
+        }
+      };
+      assert.isNull(util.listAt(3, emptyList));
+      assert.deepEqual(util.listAt(2, fullList), {
+        id: 'three',
+        data: {
+          x: 8,
+          y: 3
+        },
+        next: null
+      });
+    });
+  });
   describe('listHas()', () => {
     it('should determine if a linked list has the item specified', () => {
       const emptyList = null;
@@ -264,6 +302,30 @@ describe('util', () => {
         }
       };
       assert.equal(util.listLength(list), 3);
+      assert.equal(util.listLength({
+        data: 1,
+        next: null
+      }), 1);
+      assert.equal(util.listLength(null), 0);
+    });
+  });
+  describe('listLast()', () => {
+    it('should return the last element of a list', () => {
+      const list = {
+        data: 1,
+        next: {
+          data: 2,
+          next: {
+            data: 3,
+            next: null
+          }
+        }
+      };
+      assert.deepEqual(util.listLast(list), {
+        data: 3,
+        next: null
+      });
+      assert.isNull(util.listLast(null));
     });
   });
   describe('listSlice()', () => {
@@ -285,7 +347,11 @@ describe('util', () => {
           next: null
         }
       });
-      assert.deepEqual(util.listSlice(0, 0, null), null);
+      assert.isNull(util.listSlice(0, 0, null));
+      assert.isNull(util.listSlice(0, 0, {
+        data: 1,
+        next: null
+      }), null);
       assert.deepEqual(util.listSlice(0, 2, list), {
         data: 1,
         next: {
@@ -436,6 +502,37 @@ describe('util', () => {
       assert.isArray(result);
       assert.lengthOf(result, 2);
       assert.deepEqual(result, [list, { data: 'bar', next: null }]);
+    });
+  });
+  describe('listAppend()', () => {
+    it('should append a node to the end of a list', () => {
+      const list = {
+        data: 1,
+        next: {
+          data: 2,
+          next: {
+            data: 3,
+            next: null
+          }
+        }
+      };
+      assert.deepEqual(
+        util.listAppend(list, { data: 4, next: null }),
+        {
+          data: 1,
+          next: {
+            data: 2,
+            next: {
+              data: 3,
+              next: {
+                data: 4,
+                next: null
+              }
+            }
+          }
+        }
+      );
+      assert.isNull(util.listAppend(null, { data: 3, next: null }));
     });
   });
   describe('batchAsyncActions()', () => {

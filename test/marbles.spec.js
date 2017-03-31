@@ -102,6 +102,11 @@ describe('Marbles', () => {
     assert.property(Marbles.logic, 'and');
     assert.property(Marbles.logic, 'not');
   });
+  it('exposes some common regexes', () => {
+    assert.deepEqual(Marbles.Regex, {
+      DIGITS: /\d+/
+    });
+  });
   describe('static methods', () => {
     describe('present()', () => {
       it('should check if a segment is present in a linked list', () => {
@@ -242,6 +247,26 @@ describe('Marbles', () => {
         assert.equal(m.processRoute('#home/about/never-visible'), '/home/about/');
         assert.equal(m.processRoute('/home/about/'), '/home/about/');
       });
+      it('should set window.location.hash', () => {
+        const t = () => true;
+        const f = () => false;
+        const m = new Marbles({
+          'home': {
+            fragment: 'home',
+            rule: t
+          },
+          'about': {
+            fragment: 'about',
+            rule: t
+          },
+          'never-visible': {
+            fragment: 'never-ever-ever',
+            rule: f
+          }
+        }, {}, win);
+        assert.equal(m.processRoute('#home/about/never-visible'), '/home/about/');
+        assert.equal(win.location.hash.replace('#', ''), '/home/about/');
+      });
       it('should obey options', () => {
         const t = () => true;
         const f = () => false;
@@ -261,9 +286,17 @@ describe('Marbles', () => {
         }, {
           trailingSlash: false,
           leadingSlash: false
-        }, win);
+        },
+        win
+        );
         assert.equal(m.processRoute('#home/about/never-visible'), 'home/about');
         assert.equal(m.processRoute('home/about'), 'home/about');
+      });
+      it('should notify activation observers', () => {
+
+      });
+      it('should notify deactivation observers', () => {
+
       });
     });
     describe('activate()', () => {
@@ -271,7 +304,7 @@ describe('Marbles', () => {
         const m = new Marbles({
           home: {
             fragment: 'home',
-            rule: () => true
+            rule: () => Marbles.parent('root')
           },
           about: {
             fragment: 'about',
@@ -280,6 +313,29 @@ describe('Marbles', () => {
         }, {}, win);
         m.processRoute('#home');
         assert.equal(m.activate('about', {}), '/home/about/');
+      });
+      it('should not add a segment into the route if its rule forbids it', () => {
+        const m = new Marbles({
+          home: {
+            fragment: 'home',
+            rule: () => false
+          }
+        }, {}, win);
+        m.processRoute('');
+        assert.equal(m.activate('home', {}), '');
+      });
+      it('should use the data provided', () => {
+        const m = new Marbles({
+          user: {
+            fragment: 'users/{userId}',
+            rule: () => true,
+            tokens: {
+              userId: Marbles.Regex.DIGITS
+            }
+          }
+        }, {}, win);
+        m.processRoute('');
+        assert.equal(m.activate('user', { userId: 1 }), '/users/1/');
       });
     });
   });

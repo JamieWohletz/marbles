@@ -70,6 +70,7 @@
     "webpack": "^1.13.1"
   },
   "dependencies": {
+    "clone-deep": "^0.2.4",
     "deep-equal": "^1.0.1",
     "in-publish": "^2.0.0"
   },
