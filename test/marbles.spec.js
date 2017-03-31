@@ -1,5 +1,6 @@
 // /* eslint-env mocha */
 import Marbles from '../src/marbles';
+import { List } from 'immutable';
 import logic from '../src/logic';
 import { assert } from 'chai';
 import mockBrowser from 'mock-browser';
@@ -110,38 +111,38 @@ describe('Marbles', () => {
   describe('static methods', () => {
     describe('present()', () => {
       it('should check if a segment is present in a linked list', () => {
-        assert.isTrue(Marbles.present('root')('', {
-          id: 'root',
-          next: null
-        }));
-        assert.isFalse(Marbles.present('about')('', {
-          id: 'root',
-          next: {
+        const list = List([
+          {
+            id: 'root',
+            segment: {}
+          },
+          {
             id: 'home',
-            next: null
+            segment: {}
           }
-        }));
+        ]);
+        assert.isTrue(Marbles.present('home')('', list));
+        assert.isFalse(Marbles.present('about')('', list));
       });
     });
     describe('parent()', () => {
-      it('should check if a one segment is a direct parent of another in a linked list', () => {
-        assert.isTrue(Marbles.parent('root')('home', {
-          id: 'root',
-          next: {
+      it('should check if a one segment is the direct ancestor of another in a linked list', () => {
+        const list = List([
+          {
+            id: 'root',
+            segment: {}
+          },
+          {
             id: 'home',
-            next: null
+            segment: {}
           }
-        }));
-        assert.isFalse(Marbles.parent('root')('about', {
-          id: 'root',
-          next: {
-            id: 'home',
-            next: {
-              id: 'about',
-              next: null
-            }
-          }
-        }));
+        ]);
+        assert.isTrue(Marbles.parent('root')('home', list));
+        const withAbout = list.push({
+          id: 'about',
+          segment: {}
+        });
+        assert.isFalse(Marbles.parent('root')('about', withAbout));
       });
     });
   });
@@ -196,38 +197,7 @@ describe('Marbles', () => {
   });
   describe('instance methods', () => {
     describe('processRoute()', () => {
-      it('should construct a linked list which obeys rules', () => {
-        const t = () => true;
-        const f = () => false;
-        const m = new Marbles({
-          'home': {
-            fragment: 'home',
-            rule: t
-          },
-          'about': {
-            fragment: 'about',
-            rule: t
-          },
-          'never-visible': {
-            fragment: 'never-ever-ever',
-            rule: f
-          }
-        }, {}, win);
-        m.processRoute('#home/about/never-visible');
-        const list = m.linkedList;
-        function checkNode(id, fragment, node) {
-          assert.equal(node.id, id);
-          assert.equal(node.segment.fragment, fragment);
-          assert.isFunction(node.segment.rule);
-          assert.deepEqual(node.segment.tokens, {});
-          assert.deepEqual(node.segment.tokenData, {});
-        }
-        checkNode('root', '', list);
-        checkNode('home', 'home', list.next);
-        checkNode('about', 'about', list.next.next);
-        assert.isNull(list.next.next.next);
-      });
-      it('should return a hash route based on rules', () => {
+      it('should process a given route based on rules', () => {
         const t = () => true;
         const f = () => false;
         const m = new Marbles({
@@ -246,6 +216,22 @@ describe('Marbles', () => {
         }, {}, win);
         assert.equal(m.processRoute('#home/about/never-visible'), '/home/about/');
         assert.equal(m.processRoute('/home/about/'), '/home/about/');
+      });
+      it('should work with dynamic tokens', () => {
+        const m = new Marbles({
+          'user': {
+            fragment: 'users/{userId}',
+            tokens: {
+              userId: Marbles.Regex.DIGITS
+            },
+            rule: Marbles.parent('root')
+          },
+          'profile': {
+            fragment: 'about',
+            rule: Marbles.parent('user')
+          }
+        }, {}, win);
+        assert.equal(m.processRoute('#users/1/profile'), '/users/1/profile/');
       });
       it('should set window.location.hash', () => {
         const t = () => true;

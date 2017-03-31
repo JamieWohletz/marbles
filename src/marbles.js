@@ -1,5 +1,6 @@
 import * as util from './util';
 import * as logic from './logic';
+import { List } from 'immutable';
 // core premise: route is a linked list which obeys the rules specified in the
 // initial configuration
 
@@ -43,49 +44,56 @@ function rootSegment() {
   };
 }
 
-function newList() {
-  return {
+function listWithRoot() {
+  return List([{
     id: 'root',
-    segment: rootSegment(),
-    next: null
-  };
+    segment: rootSegment()
+  }]);
+}
+
+function stripOuterBraces(dynamicToken) {
+  return dynamicToken.substr(1, dynamicToken.length - 2);
 }
 
 function regexify(seg) {
   const newSegment = seg.fragment.replace(TOKEN_REGEX, (token) => {
-    return seg.tokens[token].source;
+    return seg.tokens[stripOuterBraces(token)].source;
   });
-  return new RegExp(newSegment);
+  return new RegExp(`^${newSegment}$`);
 }
 
-function getSegments(routeFragment, segments) {
-  const ids = util.keys(segments).filter((id) => id !== 'root');
-  if (!routeFragment) {
-    return null;
-  }
-  return ids.reduce((found, id) => {
-    if (routeFragment.search(regexify(segments[id])) !== -1) {
-      return found.concat(id);
-    }
-    return found;
-  }, []);
+function searchSegments(string, segments) {
+  return util.keys(segments).filter((id) => {
+    return regexify(segments[id]).test(string);
+  });
+}
+
+function extractData(string, segment) {
+  const tokens = segment.tokens;
+  const tokenData = util.keys(tokens).reduce((data, tokenName) => {
+    data[tokenName] = util.arrayHead(string.match(tokens[tokenName]));
+  }, {});
+  return util.assign({}, segment, {
+    tokenData
+  });
 }
 
 function matchingSegments(route, segments) {
   const fragments = route
     .split('/')
-    .reduce((arr, str) => arr.concat(str.length > 1 ? str : []), []);
-  let fragment = [];
-  let matching = [];
-  while (fragments.length > 0) {
-    fragment.push(fragments.shift());
-    const foundSegments = getSegments(fragment.join('/'), segments);
-    if (foundSegments.length) {
-      fragment = [];
-    }
-    matching = matching.concat(foundSegments);
+    .reduce((arr, str) => arr.concat(str.length >= 1 ? str : []), []);
+  let matches = [];
+  for (let i = 0; i < fragments.length; i++) {
+    const frag = fragments[i];
+    let searchFrag = frag;
+    let j = i;
+    do {
+      matches = matches.concat(searchSegments(searchFrag, segments));
+      j++;
+      searchFrag += `/${fragments[j]}`;
+    } while (j < fragments.length);
   }
-  return matching;
+  return matches;
 }
 
 function segmentToListNode(id, segments, data = {}) {
@@ -101,7 +109,6 @@ function segmentToListNode(id, segments, data = {}) {
   return {
     id,
     segment: normalizedSegment,
-    next: null
   };
 }
 
@@ -109,30 +116,23 @@ function routeToList(route, segments) {
   if (!segments.root) {
     return null;
   }
-  const initialList = newList();
+  const initialList = listWithRoot();
   const segmentIds = matchingSegments(route, segments);
-  return segmentIds.reduce((head, id) => {
-    const newHead = util.listAppend(head, segmentToListNode(id, segments, {}));
-    const ok = segments[id].rule(id, newHead);
-    return ok ? newHead : head;
+  return segmentIds.reduce((list, id) => {
+    const newList = list.push(segmentToListNode(id, segments, {}));
+    const ok = segments[id].rule(id, newList);
+    return ok ? newList : list;
   }, initialList);
 }
 
 function replaceTokens(string, data) {
-  function stripBraces(str) {
-    return str.substr(1, str.length - 2);
-  }
-  return string.replace(TOKEN_REGEX, (match) => stripBraces(data[match]));
+  return string.replace(TOKEN_REGEX, (match) => data[stripOuterBraces(match)]);
 }
 
-function listToRoute(head, leadingSlash, trailingSlash) {
-  const fragments = util.listReduce(
-    (array, { segment: { fragment, tokenData } }) => {
-      return fragment ? array.concat(replaceTokens(fragment, tokenData)) : array;
-    },
-    [],
-    head
-  );
+function listToRoute(list, leadingSlash, trailingSlash) {
+  const fragments = list.map(({ segment: { fragment, tokenData } }) => {
+    return replaceTokens(fragment, tokenData);
+  }).filter((frag) => frag !== '');
   const hash = fragments.join('/');
   return hash ? `${leadingSlash ? '/' : ''}${hash}${trailingSlash ? '/' : ''}` : hash;
 }
@@ -149,31 +149,31 @@ function chainData(list, upToNode) {
 }
 
 function listDiff(from, against, diffData) {
-  return util.listReduce((arr, node) => {
-    const found = util.listHas({ id: node.id }, against);
-    if (!found || (diffData && !util.equal(found.data, node.data))) {
-      return arr.concat(node);
+  return from.reduce((newList, node) => {
+    const found = newList.find(({ id }) => id === node.id);
+    if (!found || diffData && !util.equal(found.data, node.data)) {
+      return newList.push(node);
     }
-    return arr;
-  }, [], from);
+    return newList;
+  }, List());
 }
 
 function handleActivations(newList, oldList, observers) {
   const activated = listDiff(newList, oldList, true);
-  activated.forEach((listNode) => {
-    observers[listNode.id].activated.forEach((handler) => {
-      handler(chainData(newList, listNode));
-    });
-  });
+  // activated.forEach((listNode) => {
+  //   observers[listNode.id].activated.forEach((handler) => {
+  //     handler(chainData(newList, listNode));
+  //   });
+  // });
 }
 
 function handleDeactivations(newList, oldList, observers) {
   const deactivated = listDiff(oldList, newList, false);
-  deactivated.forEach((listNode) => {
-    observers[listNode.id].deactivated.forEach((handler) => {
-      handler();
-    });
-  });
+  // deactivated.forEach((listNode) => {
+  //   observers[listNode.id].deactivated.forEach((handler) => {
+  //     handler();
+  //   });
+  // });
 }
 
 function isValidSegment(seg) {
@@ -230,7 +230,7 @@ export default class Marbles {
       return obj;
     }, {}));
     this.win = win;
-    this.linkedList = null;
+    this.list = List();
   }
   static get logic() {
     return logic;
@@ -241,28 +241,32 @@ export default class Marbles {
     };
   }
   static present(requiredSegmentId) {
-    return (segmentId, linkedList) =>
-      util.listHas({
-        id: requiredSegmentId
-      }, linkedList);
+    return (segmentId, list) => {
+      return list.findIndex((node) => {
+        return node.id === requiredSegmentId;
+      }) !== -1;
+    };
   }
   static parent(parentId) {
-    return (segmentId, linkedList) => {
-      const parent = util.findListNode({
-        id: parentId
-      }, linkedList);
-      return parent && parent.next && parent.next.id === segmentId;
+    return (segmentId, list) => {
+      const parentIndex = list.findLastIndex((node) => {
+        return node.id === parentId;
+      });
+      const nodeIndex = list.findLastIndex((node) => {
+        return node.id === segmentId;
+      });
+      return nodeIndex === parentIndex + 1;
     };
   }
   // read the given route and fire activate and deactivate accordingly
   processRoute(hash = this.win.location.hash) {
     const route = hash.replace('#', '');
     const list = routeToList(route, this.segments);
-    handleActivations(list, this.linkedList, this.observers);
-    handleDeactivations(list, this.linkedList, this.observers);
-    this.linkedList = list;
+    handleActivations(list, this.list, this.observers);
+    handleDeactivations(list, this.list, this.observers);
+    this.list = list;
     const newRoute = listToRoute(
-      this.linkedList,
+      this.list,
       this.options.leadingSlash,
       this.options.trailingSlash
     );
@@ -271,27 +275,22 @@ export default class Marbles {
   }
   // fire activated HERE
   activate(segmentId, data) {
-    const segment = this.segments[segmentId];
+    const list = this.list;
+    const seg = this.segments[segmentId];
     const segNode = segmentToListNode(segmentId, this.segments, data);
-    const rule = segment.rule;
-    const len = util.listLength(this.linkedList);
-    let finished = false;
-    let head = this.linkedList;
-    while (!finished) {
-      finished = rule(segmentId, util.listAppend(head, segNode)) || util.listLength(head) === 0;
-      head = util.listSlice(0, util.listLength(head) - 1, head);
-    }
-    head = util.listAppend(head, segNode);
-    console.log('activate: intermediate list = ', head);
-    console.log('to append: ', util.listSlice(util.listLength(head) - 1, len, this.linkedList));
-    head = util.listAppend(
-      head,
-      util.listSlice(util.listLength(head) - 1, len, this.linkedList)
+
+    const newList = list.reduce((l, node) => {
+      const withNode = l.push(node);
+      const withSeg = withNode.push(segNode);
+      const ok = seg.rule(segmentId, withSeg);
+      return ok ? withSeg : withNode;
+    }, List());
+    const route = listToRoute(
+      newList,
+      this.options.leadingSlash,
+      this.options.trailingSlash
     );
-    console.log('activate: final list = ', head);
-    return this.processRoute(
-      listToRoute(head, this.options.leadingSlash, this.options.trailingSlash)
-    );
+    return this.processRoute(route);
   }
   // fire deactivated HERE
   deactivate(segmentId) {
