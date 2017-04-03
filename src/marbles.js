@@ -45,6 +45,10 @@ function rootSegment() {
   };
 }
 
+function listWithRoot() {
+  return List([rootSegment()]);
+}
+
 function setTokenData(segment, data) {
   return util.assign({}, segment, {
     tokenData: util.isObject(data) ? data : {}
@@ -255,7 +259,7 @@ export default class Marbles {
       return obj;
     }, {}));
     this.win = win;
-    this.list = List();
+    this.list = listWithRoot();
   }
   static get logic() {
     return logic;
@@ -319,9 +323,15 @@ export default class Marbles {
   }
   // fire deactivated HERE
   deactivate(segmentId) {
-
+    const removalIndex = this.list.findLastIndex((node) => node.id === segmentId);
+    const newRoute = listToRoute(
+      this.list.delete(removalIndex),
+      this.options.leadingSlash,
+      this.options.trailingSlash
+    );
+    return this.processRoute(newRoute);
   }
   subscribe(listenerObject) {
-
+    
   }
 }

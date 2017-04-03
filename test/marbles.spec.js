@@ -313,6 +313,10 @@ describe('Marbles', () => {
       m.processRoute('home');
       assert.equal(m.deactivate('home'), '');
     });
+    it('should do nothing for segments that are not present', () => {
+      const m = new Marbles({}, {}, win);
+      assert.equal(m.deactivate('home'), '');
+    });
   });
 });
 
