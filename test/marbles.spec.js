@@ -227,7 +227,7 @@ describe('Marbles', () => {
             rule: Marbles.parent('root')
           },
           'profile': {
-            fragment: 'about',
+            fragment: 'profile',
             rule: Marbles.parent('user')
           }
         }, {}, win);
