@@ -73,9 +73,15 @@ function segmentMatch(string, segment) {
   return string.match(regexify(segment)) || [];
 }
 
-function extractData(string, tokens) {
-  const tokenData = util.keys(tokens).reduce((data, tokenName) => {
-    data[tokenName] = util.arrayHead(string.match(tokens[tokenName]));
+function extractData(string, segment) {
+  const tokens = segment.tokens;
+  let searchString = string;
+  const tokenKeys = (segment.fragment.match(TOKEN_REGEX) || []).map(stripOuterBraces);
+  const tokenData = tokenKeys.reduce((data, tokenName) => {
+    const matches = searchString.match(tokens[tokenName]);
+    const match = util.arrayHead(matches);
+    searchString = string.substr(matches.index + match.length);
+    data[tokenName] = match;
     return data;
   }, {});
   return tokenData;
@@ -86,7 +92,7 @@ function matchingSegments(route, segments) {
     const seg = segments[key];
     const matches = segmentMatch(route, segments[key]);
     const segmentsWithData = matches.map((str) => {
-      return setTokenData(seg, extractData(str, seg.tokens));
+      return setTokenData(seg, extractData(str, seg));
     });
     return arr.concat(segmentsWithData);
   }, []);

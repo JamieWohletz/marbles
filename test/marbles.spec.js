@@ -233,6 +233,19 @@ describe('Marbles', () => {
         }, {}, win);
         assert.equal(m.processRoute('#users/1/profile'), '/users/1/profile/');
       });
+      it('should work with multiple dynamic tokens in a single segment', () => {
+        const m = new Marbles({
+          'car': {
+            fragment: 'users/{userId}/cars/{carId}',
+            tokens: {
+              userId: Marbles.Regex.DIGITS,
+              carId: Marbles.Regex.DIGITS
+            },
+            rule: () => true
+          }
+        }, {}, win);
+        assert.equal(m.processRoute('users/1/cars/2'), '/users/1/cars/2/');
+      });
       it('should set window.location.hash', () => {
         const t = () => true;
         const f = () => false;
