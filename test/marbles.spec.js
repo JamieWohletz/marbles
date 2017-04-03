@@ -1,96 +1,10 @@
 // /* eslint-env mocha */
 import Marbles from '../src/marbles';
 import { List } from 'immutable';
-import logic from '../src/logic';
 import { assert } from 'chai';
 import mockBrowser from 'mock-browser';
 import sinon from 'sinon';
-// const routes = {
-//   'root': {
-//     active: true,
-//     children: ['home', 'user', 'search'],
-//     data: {},
-//     dependency: '',
-//     segment: ''
-//   },
-//   'home': {
-//     active: false,
-//     children: [],
-//     data: {},
-//     dependency: 'root',
-//     segment: 'home'
-//   },
-//   'user': {
-//     active: false,
-//     children: ['user-profile'],
-//     data: {
-//       userId: null
-//     },
-//     dependency: 'root',
-//     segment: 'users/:userId'
-//   },
-//   'search': {
-//     active: false,
-//     children: [],
-//     data: {},
-//     dependency: 'root',
-//     segment: 'search'
-//   },
-//   'user-profile': {
-//     active: false,
-//     children: ['user-optional-details'],
-//     data: {},
-//     dependency: 'user',
-//     segment: 'profile'
-//   },
-//   'user-optional-details': {
-//     active: false,
-//     children: ['user-edit'],
-//     data: {},
-//     dependency: 'user-profile',
-//     segment: 'details'
-//   },
-//   'user-edit': {
-//     active: false,
-//     children: ['user-edit-product'],
-//     data: {},
-//     dependency: 'user-profile',
-//     segment: 'edit'
-//   },
-//   'user-edit-product': {
-//     active: false,
-//     children: [],
-//     data: {
-//       productId: null
-//     },
-//     dependency: 'user-edit',
-//     segment: 'products/:productId'
-//   }
-// };
-// let marbles;
-// let win;
-
-// const segments = {
-//   'home': {
-//     fragment: 'home',
-//     rule: present('root')
-//   },
-//   'user': {
-
-//   },
-//   'search': {
-
-//   }
-// };
-
-let marbles;
 let win;
-// beforeEach(() => {
-//   win = mockBrowser.mocks.mockBrowser.createWindow();
-//   marbles = new Marbles({
-
-//   })
-// });
 
 beforeEach(() => {
   win = mockBrowser.mocks.MockBrowser.createWindow();
@@ -217,6 +131,56 @@ describe('Marbles', () => {
         assert.equal(m.processRoute('#home/about/never-visible'), '/home/about/');
         assert.equal(m.processRoute('/home/about/'), '/home/about/');
       });
+      it('should work with complex routes', () => {
+        const m = new Marbles({
+          'user': {
+            fragment: 'users/{userId}',
+            rule: Marbles.parent('root'),
+            tokens: {
+              userId: Marbles.Regex.DIGITS
+            }
+          },
+          'user-messages': {
+            fragment: 'messages',
+            rule: Marbles.parent('user')
+          },
+          'user-messages-details': {
+            fragment: '{messageId}/details',
+            rule: Marbles.parent('user-messages'),
+            tokens: {
+              messageId: Marbles.Regex.DIGITS
+            }
+          },
+          'user-messages-compose': {
+            fragment: 'compose',
+            rule: Marbles.logic.or(
+              Marbles.parent('user-messages'),
+              Marbles.parent('user-messages-details')
+            )
+          }
+        }, {}, win);
+        assert.equal(
+          m.processRoute('#users/1/messages/3/details'),
+          '/users/1/messages/3/details/'
+        );
+        assert.equal(
+          m.processRoute('users/1/messages/compose'),
+          '/users/1/messages/compose/'
+        );
+        assert.equal(
+          m.processRoute('users/1/messages/3/details/compose'),
+          '/users/1/messages/3/details/compose/'
+        );
+      });
+      it('should remove invalid segments', () => {
+        const m = new Marbles({
+          'home': {
+            fragment: 'home',
+            rule: Marbles.parent('root'),
+          }
+        }, {}, win);
+        assert.equal(m.processRoute('/what/ever/home/for/ever'), '/home/');
+      });
       it('should work with dynamic tokens', () => {
         const m = new Marbles({
           'user': {
@@ -301,13 +265,13 @@ describe('Marbles', () => {
     describe('activate()', () => {
       it('should add a new segment into the route if allowed by its rule', () => {
         const m = new Marbles({
-          home: {
-            fragment: 'home',
-            rule: () => Marbles.parent('root')
-          },
           about: {
             fragment: 'about',
             rule: Marbles.logic.and(Marbles.present('root'), Marbles.parent('home'))
+          },
+          home: {
+            fragment: 'home',
+            rule: () => Marbles.parent('root')
           }
         }, {}, win);
         m.processRoute('#home');
@@ -336,6 +300,18 @@ describe('Marbles', () => {
         m.processRoute('');
         assert.equal(m.activate('user', { userId: 1 }), '/users/1/');
       });
+    });
+  });
+  describe('deactivate()', () => {
+    it('should remove a segment from the route', () => {
+      const m = new Marbles({
+        user: {
+          fragment: 'home',
+          rule: () => true
+        }
+      }, {}, win);
+      m.processRoute('home');
+      assert.equal(m.deactivate('home'), '');
     });
   });
 });

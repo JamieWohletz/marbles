@@ -55,6 +55,12 @@ function stripOuterBraces(dynamicToken) {
   return dynamicToken.substr(1, dynamicToken.length - 2);
 }
 
+function arraySwap(i, j, array) {
+  const tmp = array[i];
+  array[i] = array[j];
+  array[j] = tmp;
+}
+
 // TODO: memoize
 function regexify(seg) {
   const newSegment = seg.fragment.replace(TOKEN_REGEX, (token) => {
@@ -102,13 +108,26 @@ function routeToList(route, segments) {
   if (!segments.root) {
     return null;
   }
-  const initialList = List();
-  const nodes = matchingSegments(route, segments);
-  return nodes.reduce((list, node) => {
-    const newList = list.push(node);
-    const ok = node.rule(node.id, newList);
-    return ok ? newList : list;
-  }, initialList);
+  const matchingSegs = matchingSegments(route, segments);
+  const matchCount = matchingSegs.length;
+  let leftWall = 0;
+  let newList = List();
+  let added = true;
+  while (leftWall < matchCount && added) {
+    added = false;
+    for (let i = leftWall; i < matchCount; i++) {
+      const node = matchingSegs[i];
+      const listWithNode = newList.push(node);
+      if (node.rule(node.id, listWithNode)) {
+        newList = listWithNode;
+        arraySwap(i, leftWall, matchingSegs);
+        added = true;
+        leftWall += 1;
+        break;
+      }
+    }
+  }
+  return newList;
 }
 
 function replaceTokens(string, data) {
