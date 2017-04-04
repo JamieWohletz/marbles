@@ -1,62 +1,39 @@
-/* global marbles */
+/* global Marbles */
 (function demo() {
-  const Marbles = marbles.default;
   const routes = {
-    'root': {
-      active: true,
-      children: ['home', 'profile', 'user'],
-      data: {},
-      dependency: '',
-      segment: ''
-    },
     'home': {
-      active: false,
-      children: [],
-      data: {},
-      dependency: 'root',
-      segment: 'home'
+      fragment: 'home',
+      rule: Marbles.parent('root')
     },
     'profile': {
-      active: false,
-      children: [],
-      data: {},
-      dependency: 'root',
-      segment: 'profile'
+      fragment: 'profile',
+      rule: Marbles.parent('root')
     },
     'user': {
-      active: false,
-      children: ['messages'],
-      data: { userId: null },
-      dependency: 'root',
-      segment: 'users/:userId'
+      fragment: 'users/{userId}',
+      rule: Marbles.parent('root'),
+      tokens: {
+        userId: Marbles.Regex.DIGITS
+      }
     },
     'messages': {
-      active: false,
-      children: ['messages-compose'],
-      data: {},
-      dependency: 'user',
-      segment: 'messages'
+      fragment: 'messages',
+      rule: Marbles.parent('user')
     },
     'messages-compose': {
-      active: false,
-      children: ['messages-inbox', 'messages-detail'],
-      data: {},
-      dependency: 'messages',
-      segment: 'compose'
+      fragment: 'compose',
+      rule: Marbles.present('messages')
     },
     'messages-inbox': {
-      active: false,
-      children: [],
-      data: {},
-      dependency: 'messages',
-      segment: 'inbox'
+      fragment: 'inbox',
+      rule: Marbles.present('messages')
     },
     'messages-detail': {
-      active: false,
-      children: [],
-      data: {},
-      dependency: 'messages',
-      segment: 'inbox/:messageId'
+      fragment: '{messageId}/details',
+      rule: Marbles.parent('messages-inbox'),
+      tokens: {
+        messageId: Marbles.Regex.DIGITS
+      }
     }
   };
   const homeTab = document.getElementById('home-tab');
@@ -70,8 +47,8 @@
   const messagesDetail = document.getElementById('messages-detail');
   const showInbox = document.getElementById('show-inbox-button');
   const showCompose = document.getElementById('show-compose-button');
-  const marble = new Marbles(routes);
-  window.marble = marble;
+  const marbles = new Marbles(routes);
+  window.marble = marbles;
   function hide(element) {
     element.style.display = 'none';
   }
@@ -82,56 +59,56 @@
     return element.currentStyle ? element.currentStyle.display === 'none' :
       getComputedStyle(element, null).display === 'none';
   }
-  marble.subscribe({
+  marbles.subscribe({
     'home': {
-      inserted: () => {
+      activated: () => {
         homeTab.classList.add('active');
         show(home);
       },
-      removed: () => {
+      deactivated: () => {
         homeTab.classList.remove('active');
         hide(home);
       }
     },
     'profile': {
-      inserted: () => {
+      activated: () => {
         profileTab.classList.add('active');
         show(profile);
       },
-      removed: () => {
+      deactivated: () => {
         profileTab.classList.remove('active');
         hide(profile);
       }
     },
     'messages': {
-      inserted: (data) => {
+      activated: (data) => {
         messagesTab.classList.add('active');
         document.getElementById('messages-user').innerHTML = `User #${data.userId}`;
         show(messages);
       },
-      removed: () => {
+      deactivated: () => {
         messagesTab.classList.remove('active');
         hide(messages);
       }
     },
     'messages-compose': {
-      inserted: () => {
+      activated: () => {
         show(messagesCompose);
       },
-      removed: () => {
+      deactivated: () => {
         hide(messagesCompose);
       }
     },
     'messages-inbox': {
-      inserted: () => {
+      activated: () => {
         show(messagesInbox);
       },
-      removed: () => {
+      deactivated: () => {
         hide(messagesInbox);
       }
     },
     'messages-detail': {
-      inserted: (data) => {
+      activated: (data) => {
         show(messagesInbox);
         show(messagesDetail);
         document.querySelectorAll('.email-details').forEach((el) => {
@@ -139,7 +116,7 @@
         });
         show(document.getElementById(`details-${data.messageId}`));
       },
-      removed: () => {
+      deactivated: () => {
         hide(messagesInbox);
         hide(messagesDetail);
       }
@@ -147,26 +124,25 @@
   });
   document.querySelectorAll('.email').forEach((el) => {
     el.addEventListener('click', () => {
-      marble.insert('messages-detail', {
+      marbles.activate('messages-detail', {
         messageId: el.id.substr('email-'.length)
       });
     });
   });
   showInbox.addEventListener('click', () => {
     if (isHidden(messagesInbox)) {
-      marble.insert('messages-inbox');
+      marbles.activate('messages-inbox');
     } else {
-      marble.remove('messages-inbox');
+      marbles.deactivate('messages-inbox');
     }
   });
   showCompose.addEventListener('click', () => {
     if (isHidden(messagesCompose)) {
-      marble.insert('messages-compose');
+      marbles.activate('messages-compose');
     } else {
-      marble.remove('messages-compose');
+      marbles.deactivate('messages-compose');
     }
   });
-  marble.step();
-  marble.start();
+  marbles.start();
 }());
 

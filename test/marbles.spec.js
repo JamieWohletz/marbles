@@ -193,9 +193,16 @@ describe('Marbles', () => {
           profile: {
             fragment: 'profile',
             rule: Marbles.parent('user')
+          },
+          nonsense: {
+            fragment: '{nonsenseId}',
+            rule: Marbles.parent('profile'),
+            tokens: {
+              nonsenseId: Marbles.Regex.DIGITS
+            }
           }
         }, {}, win);
-        assert.equal(m.processRoute('#users/1/profile'), '/users/1/profile/');
+        assert.equal(m.processRoute('#users/1/profile/4'), '/users/1/profile/4');
       });
       it('should work with multiple dynamic tokens in a single segment', () => {
         const m = new Marbles({
@@ -323,7 +330,7 @@ describe('Marbles', () => {
         });
         m.processRoute('users/2');
       });
-      it('should notify deactivation observers', (done) => {
+      it('should notify deactivation subscribers', (done) => {
         const m = new Marbles({
           'to-deactivate': {
             fragment: 'garbage',
@@ -340,6 +347,30 @@ describe('Marbles', () => {
         m.processRoute('garbage');
         m.deactivate('to-deactivate');
       });
+    //   it('should notify activation AND deactivation subscribers', () => {
+    //     const m = new Marbles({
+    //       'to-act': {
+    //         fragment: 'active',
+    //         rule: () => true
+    //       },
+    //       'to-deact': {
+    //         fragment: 'inactive',
+    //         rule: () => true
+    //       }
+    //     }, {}, win);
+    //     m.subscribe({
+    //       'to-act': {
+    //         activated() {
+
+    //         }
+    //       },
+    //       'to-deact': {
+    //         deactivated() {
+
+    //         }
+    //       }
+    //     });
+    //   });
     });
     describe('activate()', () => {
       it('should add a new segment into the route if allowed by its rule', () => {

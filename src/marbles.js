@@ -102,7 +102,7 @@ function extractData(string, segment) {
   }, {});
   return tokenData;
 }
-
+// TODO: Fix so that found segments are removed ?
 function matchingSegments(route, segments) {
   return util.keys(segments).reduce((arr, key) => {
     const seg = segments[key];
@@ -167,8 +167,8 @@ function chainData(list, upToNode) {
 
 function listDiff(from, against, diffData) {
   return from.reduce((newList, node) => {
-    const found = newList.find(({ id }) => id === node.id);
-    if (!found || diffData && !util.equal(found.data, node.data)) {
+    const found = against.find(({ id }) => id === node.id);
+    if (!found || diffData && !util.equal(found.tokenData, node.tokenData)) {
       return newList.push(node);
     }
     return newList;
@@ -277,7 +277,7 @@ function assertValidSubscription(subscription) {
   util.keys(subscription).forEach((k) => assertValidListenerObject(subscription[k]));
 }
 
-export default class Marbles {
+module.exports = class Marbles {
   constructor(segmentConfig, options = {}, win = window) {
     const defaultOptions = {
       leadingSlash: true,
@@ -329,8 +329,14 @@ export default class Marbles {
       return nodeIndex === parentIndex + 1;
     };
   }
+  start(win = this.win) {
+    this.processRoute(win.location.hash);
+    win.addEventListener('hashchange', () => {
+      this.processRoute(win.location.hash, true);
+    });
+  }
   // read the given route and fire activate and deactivate accordingly
-  processRoute(hash = this.win.location.hash) {
+  processRoute(hash = this.win.location.hash, replace) {
     const route = hash.replace('#', '');
     const list = routeToList(route, this.segments);
     handleActivations(list, this.list, this.subscribers);
@@ -341,7 +347,12 @@ export default class Marbles {
       this.options.leadingSlash,
       this.options.trailingSlash
     );
-    this.win.location.hash = newRoute;
+    const newHash = `#${newRoute}`;
+    if (replace) {
+      this.win.history.replaceState(util.emptyObject(), '', newHash);
+    } else {
+      this.win.location.hash = newHash;
+    }
     return newRoute;
   }
   activate(segmentId, data) {
@@ -391,4 +402,4 @@ export default class Marbles {
       util.pull(deactivatorsToRm, subs[k].deactivated);
     });
   }
-}
+};
