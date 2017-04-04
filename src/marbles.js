@@ -68,15 +68,21 @@ function arraySwap(i, j, array) {
 // TODO: memoize
 function regexify(seg) {
   const newSegment = seg.fragment.replace(TOKEN_REGEX, (token) => {
-    return seg.tokens[stripOuterBraces(token)].source;
+    const tokenName = stripOuterBraces(token);
+    const regex = seg.tokens[tokenName];
+    if (!regex) {
+      throw new Error(`
+        The '${seg.id}' segment is missing a regex for its '${token}' dynamic token. 
+
+        Please add a '${tokenName}' property with a RegExp value to that segment's 'tokens' config.
+
+        In general, every segment with dynamic tokens requires a 
+        'token' config with a regex for every dynamic token in that segment.
+      `);
+    }
+    return regex.source;
   });
   return new RegExp(`${newSegment}`);
-}
-
-function searchSegments(string, segments) {
-  return util.keys(segments).filter((id) => {
-    return regexify(segments[id]).test(string);
-  });
 }
 
 function segmentMatch(string, segment) {
@@ -108,6 +114,7 @@ function matchingSegments(route, segments) {
   }, []);
 }
 
+// TODO: memoize
 function routeToList(route, segments) {
   if (!segments.root) {
     return null;
@@ -138,6 +145,7 @@ function replaceTokens(string, data) {
   return string.replace(TOKEN_REGEX, (match) => data[stripOuterBraces(match)]);
 }
 
+// TODO: memoize
 function listToRoute(list, leadingSlash, trailingSlash) {
   const fragments = list.map((node) => {
     return replaceTokens(node.fragment, node.tokenData);
@@ -146,16 +154,16 @@ function listToRoute(list, leadingSlash, trailingSlash) {
   return hash ? `${leadingSlash ? '/' : ''}${hash}${trailingSlash ? '/' : ''}` : hash;
 }
 
-// function chainData(list, upToNode) {
-//   const data = util.emptyObject();
-//   const stop = util.isObject(upToNode) ? upToNode : { data: {} };
-//   let next = list;
-//   while (next && next !== stop) {
-//     util.assign(data, next.segment.tokenData);
-//     next = next.next;
-//   }
-//   return util.assign(data, stop.segment.tokenData);
-// }
+function chainData(list, upToNode) {
+  const data = util.emptyObject();
+  const stopIndex = list.lastIndexOf(upToNode);
+  return list.reduce((chainedData, node, index) => {
+    if (stopIndex !== -1 && index > stopIndex) {
+      return chainedData;
+    }
+    return util.assign(chainedData, node.tokenData);
+  }, data);
+}
 
 function listDiff(from, against, diffData) {
   return from.reduce((newList, node) => {
@@ -167,22 +175,24 @@ function listDiff(from, against, diffData) {
   }, List());
 }
 
-function handleActivations(newList, oldList, observers) {
+function handleActivations(newList, oldList, subscribers) {
   const activated = listDiff(newList, oldList, true);
-  // activated.forEach((listNode) => {
-  //   observers[listNode.id].activated.forEach((handler) => {
-  //     handler(chainData(newList, listNode));
-  //   });
-  // });
+  activated.forEach((listNode) => {
+    subscribers[listNode.id].activated.forEach((handler) => {
+      setTimeout(() => {
+        handler(chainData(newList, listNode));
+      }, 0);
+    });
+  });
 }
 
-function handleDeactivations(newList, oldList, observers) {
+function handleDeactivations(newList, oldList, subscribers) {
   const deactivated = listDiff(oldList, newList, false);
-  // deactivated.forEach((listNode) => {
-  //   observers[listNode.id].deactivated.forEach((handler) => {
-  //     handler();
-  //   });
-  // });
+  deactivated.forEach((listNode) => {
+    subscribers[listNode.id].deactivated.forEach((handler) => {
+      setTimeout(() => handler(), 0);
+    });
+  });
 }
 
 function isValidSegment(seg) {
@@ -235,6 +245,38 @@ function normalizeSegments(segmentConfig) {
   }, {});
 }
 
+function assertValidListenerObject(listener) {
+  if (
+    !util.isObject(listener) ||
+    (
+      (typeof listener.activated !== 'undefined' &&
+      !util.isFunction(listener.activated)) ||
+      (typeof listener.deactivated !== 'undefined' &&
+      !util.isFunction(listener.deactivated))
+    )
+  ) {
+    throw new Error(`
+      Invalid ListenerObject. ListenerObjects must conform to the following interface: 
+      {
+        activated?: (data: Object): void,
+        deactivated?: (): void 
+      }
+    `);
+  }
+}
+
+function assertValidSubscription(subscription) {
+  if (!util.isObject(subscription)) {
+    throw new Error(`
+      Invalid Subscription. Subscriptions must conform to the following interface:
+      {
+        [segmentId: string]: ListenerObject
+      }
+    `);
+  }
+  util.keys(subscription).forEach((k) => assertValidListenerObject(subscription[k]));
+}
+
 export default class Marbles {
   constructor(segmentConfig, options = {}, win = window) {
     const defaultOptions = {
@@ -251,7 +293,7 @@ export default class Marbles {
     this.segments = Object.freeze(
       normalizeSegments(util.assign({}, defaultSegments, segmentConfig))
     );
-    this.observers = Object.freeze(util.keys(this.segments).reduce((obj, key) => {
+    this.subscribers = Object.freeze(util.keys(this.segments).reduce((obj, key) => {
       obj[key] = {
         activated: [],
         deactivated: []
@@ -291,8 +333,8 @@ export default class Marbles {
   processRoute(hash = this.win.location.hash) {
     const route = hash.replace('#', '');
     const list = routeToList(route, this.segments);
-    handleActivations(list, this.list, this.observers);
-    handleDeactivations(list, this.list, this.observers);
+    handleActivations(list, this.list, this.subscribers);
+    handleDeactivations(list, this.list, this.subscribers);
     this.list = list;
     const newRoute = listToRoute(
       this.list,
@@ -302,7 +344,6 @@ export default class Marbles {
     this.win.location.hash = newRoute;
     return newRoute;
   }
-  // fire activated HERE
   activate(segmentId, data) {
     const list = this.list;
     const seg = this.segments[segmentId];
@@ -321,7 +362,6 @@ export default class Marbles {
     );
     return this.processRoute(route);
   }
-  // fire deactivated HERE
   deactivate(segmentId) {
     const removalIndex = this.list.findLastIndex((node) => node.id === segmentId);
     const newRoute = listToRoute(
@@ -331,7 +371,24 @@ export default class Marbles {
     );
     return this.processRoute(newRoute);
   }
-  subscribe(listenerObject) {
-    
+  subscribe(subscription) {
+    assertValidSubscription(subscription);
+    const subs = this.subscribers;
+    util.keys(subscription).forEach((k) => {
+      const activators = subscription[k].activated || [];
+      const deactivators = subscription[k].deactivated || [];
+      subs[k].activated = subs[k].activated.concat(activators);
+      subs[k].deactivated = subs[k].deactivated.concat(deactivators);
+    });
+  }
+  unsubscribe(subscription) {
+    assertValidSubscription(subscription);
+    const subs = this.subscribers;
+    util.keys(subscription).forEach((k) => {
+      const activatorsToRm = subscription[k].activated || [];
+      const deactivatorsToRm = subscription[k].deactivated || [];
+      util.pull(activatorsToRm, subs[k].activated);
+      util.pull(deactivatorsToRm, subs[k].deactivated);
+    });
   }
 }
