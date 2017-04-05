@@ -105,6 +105,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	  array[j] = tmp;
 	}
 	
+	function childOf(parentId) {
+	  return function (segmentId, list) {
+	    var parentIndex = list.findLastIndex(function (node) {
+	      return node.id === parentId;
+	    });
+	    var nodeIndex = list.findLastIndex(function (node) {
+	      return node.id === segmentId;
+	    });
+	    return nodeIndex === parentIndex + 1;
+	  };
+	}
+	
+	function present(requiredSegmentId) {
+	  return function (segmentId, list) {
+	    return list.findIndex(function (node) {
+	      return node.id === requiredSegmentId;
+	    }) !== -1;
+	  };
+	}
+	
 	// TODO: memoize
 	function regexify(seg) {
 	  var newSegment = seg.fragment.replace(TOKEN_REGEX, function (token) {
@@ -321,9 +341,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	      var win = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.win;
 	
 	      this.processRoute(win.location.hash);
-	      win.addEventListener('hashchange', function () {
+	      this.hashChangeHandler = function () {
 	        _this.processRoute(win.location.hash, true);
-	      });
+	      };
+	      win.addEventListener('hashchange', this.hashChangeHandler);
+	    }
+	  }, {
+	    key: 'stop',
+	    value: function stop() {
+	      var win = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.win;
+	
+	      win.removeEventListener('hashchange', this.hashChangeHandler);
 	    }
 	    // read the given route and fire activate and deactivate accordingly
 	
@@ -400,31 +428,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	      });
 	    }
 	  }], [{
-	    key: 'present',
-	    value: function present(requiredSegmentId) {
-	      return function (segmentId, list) {
-	        return list.findIndex(function (node) {
-	          return node.id === requiredSegmentId;
-	        }) !== -1;
-	      };
-	    }
-	  }, {
-	    key: 'parent',
-	    value: function parent(parentId) {
-	      return function (segmentId, list) {
-	        var parentIndex = list.findLastIndex(function (node) {
-	          return node.id === parentId;
-	        });
-	        var nodeIndex = list.findLastIndex(function (node) {
-	          return node.id === segmentId;
-	        });
-	        return nodeIndex === parentIndex + 1;
-	      };
-	    }
-	  }, {
-	    key: 'logic',
+	    key: 'rules',
 	    get: function get() {
-	      return logic;
+	      return util.assign({
+	        present: present,
+	        childOf: childOf
+	      }, logic);
 	    }
 	  }, {
 	    key: 'Regex',

@@ -33,6 +33,26 @@ function arraySwap(i, j, array) {
   array[j] = tmp;
 }
 
+function childOf(parentId) {
+  return (segmentId, list) => {
+    const parentIndex = list.findLastIndex((node) => {
+      return node.id === parentId;
+    });
+    const nodeIndex = list.findLastIndex((node) => {
+      return node.id === segmentId;
+    });
+    return nodeIndex === parentIndex + 1;
+  };
+}
+
+function present(requiredSegmentId) {
+  return (segmentId, list) => {
+    return list.findIndex((node) => {
+      return node.id === requiredSegmentId;
+    }) !== -1;
+  };
+}
+
 // TODO: memoize
 function regexify(seg) {
   const newSegment = seg.fragment.replace(TOKEN_REGEX, (token) => {
@@ -276,37 +296,26 @@ module.exports = class Marbles {
     this.win = win;
     this.list = listWithRoot();
   }
-  static get logic() {
-    return logic;
+  static get rules() {
+    return util.assign({
+      present,
+      childOf
+    }, logic);
   }
   static get Regex() {
     return {
       DIGITS: DIGIT_REGEX
     };
   }
-  static present(requiredSegmentId) {
-    return (segmentId, list) => {
-      return list.findIndex((node) => {
-        return node.id === requiredSegmentId;
-      }) !== -1;
-    };
-  }
-  static parent(parentId) {
-    return (segmentId, list) => {
-      const parentIndex = list.findLastIndex((node) => {
-        return node.id === parentId;
-      });
-      const nodeIndex = list.findLastIndex((node) => {
-        return node.id === segmentId;
-      });
-      return nodeIndex === parentIndex + 1;
-    };
-  }
   start(win = this.win) {
     this.processRoute(win.location.hash);
-    win.addEventListener('hashchange', () => {
+    this.hashChangeHandler = () => {
       this.processRoute(win.location.hash, true);
-    });
+    };
+    win.addEventListener('hashchange', this.hashChangeHandler);
+  }
+  stop(win = this.win) {
+    win.removeEventListener('hashchange', this.hashChangeHandler);
   }
   // read the given route and fire activate and deactivate accordingly
   processRoute(hash = this.win.location.hash, replace) {

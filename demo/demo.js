@@ -4,17 +4,17 @@
     {
       id: 'home',
       fragment: 'home',
-      rule: Marbles.parent('root')
+      rule: Marbles.rules.childOf('root')
     },
     {
       id: 'profile',
       fragment: 'profile',
-      rule: Marbles.parent('root')
+      rule: Marbles.rules.childOf('root')
     },
     {
       id: 'user',
       fragment: 'users/{userId}',
-      rule: Marbles.parent('root'),
+      rule: Marbles.rules.childOf('root'),
       tokens: {
         userId: Marbles.Regex.DIGITS
       }
@@ -22,22 +22,22 @@
     {
       id: 'messages',
       fragment: 'messages',
-      rule: Marbles.parent('user')
+      rule: Marbles.rules.childOf('user')
     },
     {
       id: 'messages-compose',
       fragment: 'compose',
-      rule: Marbles.present('messages')
+      rule: Marbles.rules.present('messages')
     },
     {
       id: 'messages-inbox',
       fragment: 'inbox',
-      rule: Marbles.present('messages')
+      rule: Marbles.rules.present('messages')
     },
     {
       id: 'messages-detail',
       fragment: '{messageId}',
-      rule: Marbles.parent('messages-inbox'),
+      rule: Marbles.rules.childOf('messages-inbox'),
       tokens: {
         messageId: Marbles.Regex.DIGITS
       }

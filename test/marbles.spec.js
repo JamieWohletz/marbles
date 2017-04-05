@@ -11,18 +11,22 @@ beforeEach(() => {
 });
 
 describe('Marbles', () => {
-  it('exposes the logic module', () => {
-    assert.isObject(Marbles.logic);
-    assert.property(Marbles.logic, 'or');
-    assert.property(Marbles.logic, 'and');
-    assert.property(Marbles.logic, 'not');
-  });
   it('exposes some common regexes', () => {
     assert.deepEqual(Marbles.Regex, {
       DIGITS: /\d+/
     });
   });
-  describe('static methods', () => {
+  describe('.rules', () => {
+    it('is visible as a static property', () => {
+      assert.isObject(Marbles.rules);
+    });
+    it('exposes logic.or, logic.not, logic.and, and present and childOf', () => {
+      assert.property(Marbles.rules, 'or');
+      assert.property(Marbles.rules, 'not');
+      assert.property(Marbles.rules, 'and');
+      assert.property(Marbles.rules, 'childOf');
+      assert.property(Marbles.rules, 'present');
+    });
     describe('present()', () => {
       it('should check if a segment is present in a linked list', () => {
         const list = List([
@@ -35,11 +39,11 @@ describe('Marbles', () => {
             segment: {}
           }
         ]);
-        assert.isTrue(Marbles.present('home')('', list));
-        assert.isFalse(Marbles.present('about')('', list));
+        assert.isTrue(Marbles.rules.present('home')('', list));
+        assert.isFalse(Marbles.rules.present('about')('', list));
       });
     });
-    describe('parent()', () => {
+    describe('childOf()', () => {
       it('should check if a one segment is the direct ancestor of another in a linked list', () => {
         const list = List([
           {
@@ -51,12 +55,12 @@ describe('Marbles', () => {
             segment: {}
           }
         ]);
-        assert.isTrue(Marbles.parent('root')('home', list));
+        assert.isTrue(Marbles.rules.childOf('root')('home', list));
         const withAbout = list.push({
           id: 'about',
           segment: {}
         });
-        assert.isFalse(Marbles.parent('root')('about', withAbout));
+        assert.isFalse(Marbles.rules.childOf('root')('about', withAbout));
       });
     });
   });
@@ -155,7 +159,7 @@ describe('Marbles', () => {
             tokens: {
               ambigId: Marbles.Regex.DIGITS
             },
-            rule: () => Marbles.parent('root')
+            rule: () => Marbles.rules.childOf('root')
           },
           {
             id: 'ambiguous-two',
@@ -163,7 +167,7 @@ describe('Marbles', () => {
             tokens: {
               ambigId: Marbles.Regex.DIGITS
             },
-            rule: () => Marbles.parent('root')
+            rule: () => Marbles.rules.childOf('root')
           }
         ], {}, win);
         assert.equal(m.processRoute('ambiguous/3'), '/3/');
@@ -173,7 +177,7 @@ describe('Marbles', () => {
           {
             id: 'user',
             fragment: 'users/{userId}',
-            rule: Marbles.parent('root'),
+            rule: Marbles.rules.childOf('root'),
             tokens: {
               userId: Marbles.Regex.DIGITS
             }
@@ -181,12 +185,12 @@ describe('Marbles', () => {
           {
             id: 'user-messages',
             fragment: 'messages',
-            rule: Marbles.parent('user')
+            rule: Marbles.rules.childOf('user')
           },
           {
             id: 'user-messages-details',
             fragment: '{messageId}/details',
-            rule: Marbles.parent('user-messages'),
+            rule: Marbles.rules.childOf('user-messages'),
             tokens: {
               messageId: Marbles.Regex.DIGITS
             }
@@ -194,9 +198,9 @@ describe('Marbles', () => {
           {
             id: 'user-messages-compose',
             fragment: 'compose',
-            rule: Marbles.logic.or(
-              Marbles.parent('user-messages'),
-              Marbles.parent('user-messages-details')
+            rule: Marbles.rules.or(
+              Marbles.rules.childOf('user-messages'),
+              Marbles.rules.childOf('user-messages-details')
             )
           }
         ], {}, win);
@@ -218,7 +222,7 @@ describe('Marbles', () => {
           {
             id: 'home',
             fragment: 'home',
-            rule: Marbles.parent('root'),
+            rule: Marbles.rules.childOf('root'),
           }
         ], {}, win);
         assert.equal(m.processRoute('/what/ever/home/for/ever'), '/home/');
@@ -231,17 +235,17 @@ describe('Marbles', () => {
             tokens: {
               userId: Marbles.Regex.DIGITS
             },
-            rule: Marbles.parent('root')
+            rule: Marbles.rules.childOf('root')
           },
           {
             id: 'profile',
             fragment: 'profile',
-            rule: Marbles.parent('user')
+            rule: Marbles.rules.childOf('user')
           },
           {
             id: 'nonsense',
             fragment: '{nonsenseId}',
-            rule: Marbles.parent('profile'),
+            rule: Marbles.rules.childOf('profile'),
             tokens: {
               nonsenseId: Marbles.Regex.DIGITS
             }
@@ -344,12 +348,12 @@ describe('Marbles', () => {
           {
             id: 'profile',
             fragment: 'profile',
-            rule: Marbles.parent('user')
+            rule: Marbles.rules.childOf('user')
           },
           {
             id: 'post',
             fragment: 'posts/{postId}',
-            rule: Marbles.parent('profile'),
+            rule: Marbles.rules.childOf('profile'),
             tokens: {
               postId: Marbles.Regex.DIGITS
             }
@@ -405,30 +409,6 @@ describe('Marbles', () => {
         m.processRoute('garbage');
         m.deactivate('to-deactivate');
       });
-    //   it('should notify activation AND deactivation subscribers', () => {
-    //     const m = new Marbles({
-    //       'to-act': {
-    //         fragment: 'active',
-    //         rule: () => true
-    //       },
-    //       'to-deact': {
-    //         fragment: 'inactive',
-    //         rule: () => true
-    //       }
-    //     }, {}, win);
-    //     m.subscribe({
-    //       'to-act': {
-    //         activated() {
-
-    //         }
-    //       },
-    //       'to-deact': {
-    //         deactivated() {
-
-    //         }
-    //       }
-    //     });
-    //   });
     });
     describe('activate()', () => {
       it('should add a new segment into the route if allowed by its rule', () => {
@@ -436,12 +416,12 @@ describe('Marbles', () => {
           {
             id: 'about',
             fragment: 'about',
-            rule: Marbles.logic.and(Marbles.present('root'), Marbles.parent('home'))
+            rule: Marbles.rules.and(Marbles.rules.present('root'), Marbles.rules.childOf('home'))
           },
           {
             id: 'home',
             fragment: 'home',
-            rule: () => Marbles.parent('root')
+            rule: () => Marbles.rules.childOf('root')
           }
         ], {}, win);
         m.processRoute('#home');
@@ -489,6 +469,61 @@ describe('Marbles', () => {
     it('should do nothing for segments that are not present', () => {
       const m = new Marbles([], {}, win);
       assert.equal(m.deactivate('home'), '');
+    });
+  });
+  describe('start()', () => {
+    it('should listen to window hash change events', (done) => {
+      const m = new Marbles([
+        {
+          id: 'home',
+          fragment: 'home',
+          rule: Marbles.rules.childOf('root')
+        }
+      ], {}, win);
+      m.subscribe({
+        home: {
+          activated: () => {
+            done();
+          }
+        }
+      });
+      m.start();
+      win.location.hash = 'home';
+    });
+    it('should process the current window hash route', (done) => {
+      const m = new Marbles([
+        {
+          id: 'home',
+          fragment: 'home',
+          rule: Marbles.rules.childOf('root')
+        }
+      ], {}, win);
+      m.subscribe({
+        home: {
+          activated: () => {
+            done();
+          }
+        }
+      });
+      win.location.hash = 'home';
+      m.start();
+    });
+  });
+  describe('stop()', () => {
+    it('should stop listening to window hash change events', () => {
+      const m = new Marbles([
+        {
+          id: 'home',
+          fragment: 'home',
+          rule: Marbles.rules.childOf('root')
+        }
+      ], {}, win);
+      win.location.hash = 'blah';
+      m.start();
+      assert.equal(win.location.hash.replace('#', ''), '');
+      m.stop();
+      win.location.hash = 'blah';
+      assert.equal(win.location.hash.replace('#', ''), 'blah');
     });
   });
 });
