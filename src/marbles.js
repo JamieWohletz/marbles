@@ -384,4 +384,7 @@ module.exports = class Marbles {
       util.pull(deactivatorsToRm, subs[k].deactivated);
     });
   }
+  getData() {
+    return chainData(this.list);
+  }
 };

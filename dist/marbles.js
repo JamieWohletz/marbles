@@ -427,6 +427,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	        util.pull(deactivatorsToRm, subs[k].deactivated);
 	      });
 	    }
+	  }, {
+	    key: 'getData',
+	    value: function getData() {
+	      return chainData(this.list);
+	    }
 	  }], [{
 	    key: 'rules',
 	    get: function get() {

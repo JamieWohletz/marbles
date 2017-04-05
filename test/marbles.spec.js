@@ -526,4 +526,31 @@ describe('Marbles', () => {
       assert.equal(win.location.hash.replace('#', ''), 'blah');
     });
   });
+  describe('getData()', () => {
+    it('should return the data currently stored in the route', () => {
+      const m = new Marbles([
+        {
+          id: 'user',
+          fragment: 'users/{userId}',
+          rule: Marbles.rules.childOf('root'),
+          tokens: {
+            userId: Marbles.Regex.DIGITS
+          }
+        },
+        {
+          id: 'car',
+          fragment: 'cars/{carId}',
+          rule: Marbles.rules.childOf('user'),
+          tokens: {
+            carId: Marbles.Regex.DIGITS
+          }
+        }
+      ], {}, win);
+      m.processRoute('users/1/cars/3');
+      assert.deepEqual(m.getData(), {
+        userId: '1',
+        carId: '3'
+      });
+    });
+  });
 });
