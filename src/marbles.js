@@ -1,37 +1,7 @@
 import * as util from './util';
 import * as logic from './logic';
 import { List } from 'immutable';
-// core premise: route is a linked list which obeys the rules specified in the
-// initial configuration
 
-// with that in mind, what should the api be?
-
-/*
-constructor :: SegmentConfig -> Options -> Router
-activate :: SegmentId -> Data -> Null
-deactivate :: SegmentId -> Null
-subscribe({
-  'home': {
-    activated: f,
-    deactivated: f
-  }
-})
-updateRoute :: String
-start()
-stop()
-*/
-
-/*
-config = {
-  segmentId: {
-    fragment: string,
-    rule: Function(callback, segmentId, linkedList),
-    tokens: {
-      key: regex
-    }
-  }
-}
-*/
 const TOKEN_REGEX = /{([^}]+)}/g;
 const DIGIT_REGEX = /\d+/;
 
@@ -50,9 +20,7 @@ function listWithRoot() {
 }
 
 function setTokenData(segment, data) {
-  return util.assign({}, segment, {
-    tokenData: util.isObject(data) ? data : {}
-  });
+  return util.assign({}, segment, { tokenData: util.isObject(data) ? data : {} });
 }
 
 function stripOuterBraces(dynamicToken) {
@@ -85,10 +53,6 @@ function regexify(seg) {
   return new RegExp(`${newSegment}`);
 }
 
-function segmentMatch(string, segment) {
-  return string.match(regexify(segment)) || [];
-}
-
 function extractData(string, segment) {
   const tokens = segment.tokens;
   let searchString = string;
@@ -102,43 +66,40 @@ function extractData(string, segment) {
   }, {});
   return tokenData;
 }
-// TODO: Fix so that found segments are removed ?
-function matchingSegments(route, segments) {
-  return util.keys(segments).reduce((arr, key) => {
-    const seg = segments[key];
-    const matches = segmentMatch(route, segments[key]);
-    const segmentsWithData = matches.map((str) => {
-      return setTokenData(seg, extractData(str, seg));
-    });
-    return arr.concat(segmentsWithData);
-  }, []);
+
+function canPush(segment, list) {
+  const newList = list.push(segment);
+  if (segment && segment.rule(segment.id, newList)) {
+    return true;
+  }
+  return false;
 }
 
 // TODO: memoize
 function routeToList(route, segments) {
-  if (!segments.root) {
-    return null;
-  }
-  const matchingSegs = matchingSegments(route, segments);
-  const matchCount = matchingSegs.length;
+  const segs = segments.toArray();
+  let list = List();
+  let matchString = route;
   let leftWall = 0;
-  let newList = List();
-  let added = true;
-  while (leftWall < matchCount && added) {
-    added = false;
-    for (let i = leftWall; i < matchCount; i++) {
-      const node = matchingSegs[i];
-      const listWithNode = newList.push(node);
-      if (node.rule(node.id, listWithNode)) {
-        newList = listWithNode;
-        arraySwap(i, leftWall, matchingSegs);
-        added = true;
+  let finished = false;
+  while (!finished) {
+    finished = true;
+    for (let i = leftWall; i < segs.length; i++) {
+      const seg = segs[i];
+      const regex = regexify(seg);
+      const match = matchString.match(regex);
+      if (match && canPush(seg, list)) {
+        const data = extractData(matchString, seg);
+        matchString = matchString.replace(regex, '');
+        arraySwap(i, leftWall, segs);
         leftWall += 1;
+        finished = false;
+        list = list.push(setTokenData(seg, data));
         break;
       }
     }
   }
-  return newList;
+  return list;
 }
 
 function replaceTokens(string, data) {
@@ -195,19 +156,27 @@ function handleDeactivations(newList, oldList, subscribers) {
   });
 }
 
-function isValidSegment(seg) {
-  return util.isObject(seg)
+function assertValidSegment(seg) {
+  if (!(util.isObject(seg)
+    && util.isString(seg.id)
     && util.isString(seg.fragment)
     && util.isFunction(seg.rule)
     && (
       typeof seg.tokens === 'undefined' ||
       util.isObject(seg.tokens)
-    );
-}
-
-function isValidConfig(conf) {
-  return util.isObject(conf)
-    && util.keys(conf).reduce((b, segId) => isValidSegment(conf[segId]), true);
+    ))) {
+    throw new Error(`
+          Invalid segment. Segments must conform to the following interface: 
+          {
+            id: string,
+            fragment: string,
+            rule: (segmentId: string, routeList: ImmutableList): Boolean,
+            tokens?: {
+              [tokenName]: RegExp
+            }
+          }
+        `);
+  }
 }
 
 function assertOptionsOk(options) {
@@ -216,21 +185,31 @@ function assertOptionsOk(options) {
   }
 }
 
-function assertSegmentConfigOk(segmentConfig) {
-  if (!isValidConfig(segmentConfig)) {
+function assertValidSegments(segments) {
+  if (!util.isArray(segments)) {
     throw new Error(
       `
-        Invalid segment configuration.
-        Please read the docs for details on proper segment configuration.
-        `
+        Invalid segments configuration. Segments configuration must be an array of Segment objects.
+        Please consult the documentation for more information on the Segment interface.
+      `
     );
   }
+  segments.forEach(assertValidSegment);
+  segments.reduce((set, seg) => {
+    if (set[seg.id]) {
+      throw new Error(`
+        Duplicate segment ID '${seg.id}'!
+        Please remove this duplicate from your segment configs.
+      `);
+    }
+    set[seg.id] = true;
+    return set;
+  }, {});
 }
 
-function normalizeSegment(id, segment) {
+function normalizeSegment(segment) {
   return util.assign(
     {
-      id,
       tokens: {},
       tokenData: {}
     },
@@ -238,11 +217,10 @@ function normalizeSegment(id, segment) {
   );
 }
 
-function normalizeSegments(segmentConfig) {
-  return util.keys(segmentConfig).reduce((norm, id) => {
-    norm[id] = normalizeSegment(id, segmentConfig[id]);
-    return norm;
-  }, {});
+function normalizeSegments(segments) {
+  return List(segments.map((segment) => {
+    return normalizeSegment(segment);
+  }));
 }
 
 function assertValidListenerObject(listener) {
@@ -250,9 +228,9 @@ function assertValidListenerObject(listener) {
     !util.isObject(listener) ||
     (
       (typeof listener.activated !== 'undefined' &&
-      !util.isFunction(listener.activated)) ||
+        !util.isFunction(listener.activated)) ||
       (typeof listener.deactivated !== 'undefined' &&
-      !util.isFunction(listener.deactivated))
+        !util.isFunction(listener.deactivated))
     )
   ) {
     throw new Error(`
@@ -278,23 +256,18 @@ function assertValidSubscription(subscription) {
 }
 
 module.exports = class Marbles {
-  constructor(segmentConfig, options = {}, win = window) {
+  constructor(segmentsConfig, options = {}, win = window) {
     const defaultOptions = {
       leadingSlash: true,
       trailingSlash: true
     };
-    const defaultSegments = {
-      root: rootSegment()
-    };
 
-    assertSegmentConfigOk(segmentConfig);
+    assertValidSegments(segmentsConfig);
     assertOptionsOk(options);
     this.options = util.assign({}, defaultOptions, options);
-    this.segments = Object.freeze(
-      normalizeSegments(util.assign({}, defaultSegments, segmentConfig))
-    );
-    this.subscribers = Object.freeze(util.keys(this.segments).reduce((obj, key) => {
-      obj[key] = {
+    this.segments = normalizeSegments([rootSegment()].concat(segmentsConfig));
+    this.subscribers = Object.freeze(this.segments.reduce((obj, { id }) => {
+      obj[id] = {
         activated: [],
         deactivated: []
       };
@@ -357,7 +330,7 @@ module.exports = class Marbles {
   }
   activate(segmentId, data) {
     const list = this.list;
-    const seg = this.segments[segmentId];
+    const seg = this.segments.find(({ id }) => id === segmentId);
     const segNode = setTokenData(seg, data);
 
     const newList = list.reduce((l, node) => {

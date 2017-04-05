@@ -62,16 +62,18 @@ describe('Marbles', () => {
   });
   describe('constructor()', () => {
     it('should accept valid segment configs', () => {
-      const valid = {
-        'home': {
+      const valid = [
+        {
+          id: 'home',
           fragment: 'home',
           rule: () => true
         },
-        'about-with-a-dash-for-eslint': {
+        {
+          id: 'about',
           fragment: 'about',
           rule: () => false
         }
-      };
+      ];
       assert.doesNotThrow(() => new Marbles(valid, {}, win));
     });
     it('should error for invalid segment configs', () => {
@@ -80,20 +82,31 @@ describe('Marbles', () => {
           rule: 325
         }
       };
-      assert.throws(() => new Marbles(invalid, {}, win), Error);
-    });
-    it('should accept valid options', () => {
-      const segments = {
-        'home': {
+      const dupIds = [
+        {
+          id: 'home',
           fragment: 'home',
           rule: () => true
         },
-        'about-with-a-dash-for-eslint': {
+        {
+          id: 'home',
           fragment: 'about',
           rule: () => false
         }
-      };
-      assert.doesNotThrow(() => new Marbles(segments, {}, win));
+      ];
+      const missingRule = [{
+        id: 'home',
+        fragment: 'home'
+      }];
+      assert.throws(() => new Marbles(invalid, {}, win), Error);
+      assert.throws(() => new Marbles(dupIds, {}, win), Error);
+      assert.throws(() => new Marbles(missingRule, {}, win), Error);
+    });
+    it('should accept valid options', () => {
+      const segments = [];
+      assert.doesNotThrow(
+        () => new Marbles(segments, { trailingSlash: true, leadingSlash: true }, win)
+      );
     });
     it('should error for invalid options', () => {
       const segments = {
@@ -114,51 +127,79 @@ describe('Marbles', () => {
       it('should process a given route based on rules', () => {
         const t = () => true;
         const f = () => false;
-        const m = new Marbles({
-          'home': {
+        const m = new Marbles([
+          {
+            id: 'home',
             fragment: 'home',
             rule: t
           },
-          'about': {
+          {
+            id: 'about',
             fragment: 'about',
             rule: t
           },
-          'never-visible': {
+          {
+            id: 'never-visible',
             fragment: 'never-ever-ever',
             rule: f
           }
-        }, {}, win);
+        ], {}, win);
         assert.equal(m.processRoute('#home/about/never-visible'), '/home/about/');
         assert.equal(m.processRoute('/home/about/'), '/home/about/');
       });
+      it('should process rules in order', () => {
+        const m = new Marbles([
+          {
+            id: 'ambiguous-one',
+            fragment: '{ambigId}',
+            tokens: {
+              ambigId: Marbles.Regex.DIGITS
+            },
+            rule: () => Marbles.parent('root')
+          },
+          {
+            id: 'ambiguous-two',
+            fragment: 'ambiguous/{ambigId}',
+            tokens: {
+              ambigId: Marbles.Regex.DIGITS
+            },
+            rule: () => Marbles.parent('root')
+          }
+        ], {}, win);
+        assert.equal(m.processRoute('ambiguous/3'), '/3/');
+      });
       it('should work with complex routes', () => {
-        const m = new Marbles({
-          'user': {
+        const m = new Marbles([
+          {
+            id: 'user',
             fragment: 'users/{userId}',
             rule: Marbles.parent('root'),
             tokens: {
               userId: Marbles.Regex.DIGITS
             }
           },
-          'user-messages': {
+          {
+            id: 'user-messages',
             fragment: 'messages',
             rule: Marbles.parent('user')
           },
-          'user-messages-details': {
+          {
+            id: 'user-messages-details',
             fragment: '{messageId}/details',
             rule: Marbles.parent('user-messages'),
             tokens: {
               messageId: Marbles.Regex.DIGITS
             }
           },
-          'user-messages-compose': {
+          {
+            id: 'user-messages-compose',
             fragment: 'compose',
             rule: Marbles.logic.or(
               Marbles.parent('user-messages'),
               Marbles.parent('user-messages-details')
             )
           }
-        }, {}, win);
+        ], {}, win);
         assert.equal(
           m.processRoute('#users/1/messages/3/details'),
           '/users/1/messages/3/details/'
@@ -173,40 +214,45 @@ describe('Marbles', () => {
         );
       });
       it('should remove invalid segments', () => {
-        const m = new Marbles({
-          home: {
+        const m = new Marbles([
+          {
+            id: 'home',
             fragment: 'home',
             rule: Marbles.parent('root'),
           }
-        }, {}, win);
+        ], {}, win);
         assert.equal(m.processRoute('/what/ever/home/for/ever'), '/home/');
       });
       it('should work with dynamic tokens', () => {
-        const m = new Marbles({
-          user: {
+        const m = new Marbles([
+          {
+            id: 'user',
             fragment: 'users/{userId}',
             tokens: {
               userId: Marbles.Regex.DIGITS
             },
             rule: Marbles.parent('root')
           },
-          profile: {
+          {
+            id: 'profile',
             fragment: 'profile',
             rule: Marbles.parent('user')
           },
-          nonsense: {
+          {
+            id: 'nonsense',
             fragment: '{nonsenseId}',
             rule: Marbles.parent('profile'),
             tokens: {
               nonsenseId: Marbles.Regex.DIGITS
             }
           }
-        }, {}, win);
-        assert.equal(m.processRoute('#users/1/profile/4'), '/users/1/profile/4');
+        ], {}, win);
+        assert.equal(m.processRoute('#users/1/profile/4'), '/users/1/profile/4/');
       });
       it('should work with multiple dynamic tokens in a single segment', () => {
-        const m = new Marbles({
-          car: {
+        const m = new Marbles([
+          {
+            id: 'car',
             fragment: 'users/{userId}/cars/{carId}',
             tokens: {
               userId: Marbles.Regex.DIGITS,
@@ -214,46 +260,52 @@ describe('Marbles', () => {
             },
             rule: () => true
           }
-        }, {}, win);
+        ], {}, win);
         assert.equal(m.processRoute('users/1/cars/2'), '/users/1/cars/2/');
       });
       it('should set window.location.hash', () => {
         const t = () => true;
         const f = () => false;
-        const m = new Marbles({
-          'home': {
+        const m = new Marbles([
+          {
+            id: 'home',
             fragment: 'home',
             rule: t
           },
-          'about': {
+          {
+            id: 'about',
             fragment: 'about',
             rule: t
           },
-          'never-visible': {
+          {
+            id: 'never-visible',
             fragment: 'never-ever-ever',
             rule: f
           }
-        }, {}, win);
+        ], {}, win);
         assert.equal(m.processRoute('#home/about/never-visible'), '/home/about/');
         assert.equal(win.location.hash.replace('#', ''), '/home/about/');
       });
       it('should obey options', () => {
         const t = () => true;
         const f = () => false;
-        const m = new Marbles({
-          'home': {
+        const m = new Marbles([
+          {
+            id: 'home',
             fragment: 'home',
             rule: t
           },
-          'about': {
+          {
+            id: 'about',
             fragment: 'about',
             rule: t
           },
-          'never-visible': {
+          {
+            id: 'never-visible',
             fragment: 'never-ever-ever',
             rule: f
           }
-        }, {
+        ], {
           trailingSlash: false,
           leadingSlash: false
         },
@@ -263,12 +315,13 @@ describe('Marbles', () => {
         assert.equal(m.processRoute('home/about'), 'home/about');
       });
       it('should notify activation subscribers', (done) => {
-        const m = new Marbles({
-          'to-activate': {
+        const m = new Marbles([
+          {
+            id: 'to-activate',
             fragment: 'to-activate',
             rule: () => true
           }
-        }, {}, win);
+        ], {}, win);
         m.subscribe({
           'to-activate': {
             activated() {
@@ -279,26 +332,29 @@ describe('Marbles', () => {
         m.processRoute('to-activate');
       });
       it('should notify activation subscribers with data', (done) => {
-        const m = new Marbles({
-          user: {
+        const m = new Marbles([
+          {
+            id: 'user',
             fragment: 'users/{userId}',
             rule: () => true,
             tokens: {
               userId: Marbles.Regex.DIGITS
             }
           },
-          profile: {
+          {
+            id: 'profile',
             fragment: 'profile',
             rule: Marbles.parent('user')
           },
-          post: {
+          {
+            id: 'post',
             fragment: 'posts/{postId}',
             rule: Marbles.parent('profile'),
             tokens: {
               postId: Marbles.Regex.DIGITS
             }
           }
-        }, {}, win);
+        ], {}, win);
         m.subscribe({
           post: {
             activated(data) {
@@ -310,15 +366,16 @@ describe('Marbles', () => {
         assert.equal(m.processRoute('users/1/profile/posts/2'), '/users/1/profile/posts/2/');
       });
       it('should notify activation subscribers on data change', (done) => {
-        const m = new Marbles({
-          user: {
+        const m = new Marbles([
+          {
+            id: 'user',
             fragment: 'users/{userId}',
             rule: () => true,
             tokens: {
               userId: Marbles.Regex.DIGITS
             }
           }
-        }, {}, win);
+        ], {}, win);
         m.processRoute('users/1');
         m.subscribe({
           user: {
@@ -331,12 +388,13 @@ describe('Marbles', () => {
         m.processRoute('users/2');
       });
       it('should notify deactivation subscribers', (done) => {
-        const m = new Marbles({
-          'to-deactivate': {
+        const m = new Marbles([
+          {
+            id: 'to-deactivate',
             fragment: 'garbage',
             rule: () => true
           }
-        }, {}, win);
+        ], {}, win);
         m.subscribe({
           'to-deactivate': {
             deactivated: () => {
@@ -374,39 +432,43 @@ describe('Marbles', () => {
     });
     describe('activate()', () => {
       it('should add a new segment into the route if allowed by its rule', () => {
-        const m = new Marbles({
-          about: {
+        const m = new Marbles([
+          {
+            id: 'about',
             fragment: 'about',
             rule: Marbles.logic.and(Marbles.present('root'), Marbles.parent('home'))
           },
-          home: {
+          {
+            id: 'home',
             fragment: 'home',
             rule: () => Marbles.parent('root')
           }
-        }, {}, win);
+        ], {}, win);
         m.processRoute('#home');
         assert.equal(m.activate('about', {}), '/home/about/');
       });
       it('should not add a segment into the route if its rule forbids it', () => {
-        const m = new Marbles({
-          home: {
+        const m = new Marbles([
+          {
+            id: 'home',
             fragment: 'home',
             rule: () => false
           }
-        }, {}, win);
+        ], {}, win);
         m.processRoute('');
         assert.equal(m.activate('home', {}), '');
       });
       it('should use the data provided', () => {
-        const m = new Marbles({
-          user: {
+        const m = new Marbles([
+          {
+            id: 'user',
             fragment: 'users/{userId}',
             rule: () => true,
             tokens: {
               userId: Marbles.Regex.DIGITS
             }
           }
-        }, {}, win);
+        ], {}, win);
         m.processRoute('');
         assert.equal(m.activate('user', { userId: 1 }), '/users/1/');
       });
@@ -414,17 +476,18 @@ describe('Marbles', () => {
   });
   describe('deactivate()', () => {
     it('should remove a segment from the route', () => {
-      const m = new Marbles({
-        user: {
+      const m = new Marbles([
+        {
+          id: 'home',
           fragment: 'home',
           rule: () => true
         }
-      }, {}, win);
+      ], {}, win);
       m.processRoute('home');
       assert.equal(m.deactivate('home'), '');
     });
     it('should do nothing for segments that are not present', () => {
-      const m = new Marbles({}, {}, win);
+      const m = new Marbles([], {}, win);
       assert.equal(m.deactivate('home'), '');
     });
   });
