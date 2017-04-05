@@ -1,41 +1,48 @@
 /* global Marbles */
 (function demo() {
-  const routes = {
-    'home': {
+  const routes = [
+    {
+      id: 'home',
       fragment: 'home',
       rule: Marbles.parent('root')
     },
-    'profile': {
+    {
+      id: 'profile',
       fragment: 'profile',
       rule: Marbles.parent('root')
     },
-    'user': {
+    {
+      id: 'user',
       fragment: 'users/{userId}',
       rule: Marbles.parent('root'),
       tokens: {
         userId: Marbles.Regex.DIGITS
       }
     },
-    'messages': {
+    {
+      id: 'messages',
       fragment: 'messages',
       rule: Marbles.parent('user')
     },
-    'messages-compose': {
+    {
+      id: 'messages-compose',
       fragment: 'compose',
       rule: Marbles.present('messages')
     },
-    'messages-inbox': {
+    {
+      id: 'messages-inbox',
       fragment: 'inbox',
       rule: Marbles.present('messages')
     },
-    'messages-detail': {
-      fragment: '{messageId}/details',
+    {
+      id: 'messages-detail',
+      fragment: '{messageId}',
       rule: Marbles.parent('messages-inbox'),
       tokens: {
         messageId: Marbles.Regex.DIGITS
       }
     }
-  };
+  ];
   const homeTab = document.getElementById('home-tab');
   const profileTab = document.getElementById('profile-tab');
   const messagesTab = document.getElementById('messages-tab');
