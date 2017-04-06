@@ -41,7 +41,7 @@ function childOf(parentId) {
     const nodeIndex = list.findLastIndex((node) => {
       return node.id === segmentId;
     });
-    return nodeIndex === parentIndex + 1;
+    return parentIndex !== -1 && nodeIndex === parentIndex + 1;
   };
 }
 
@@ -73,14 +73,14 @@ function regexify(seg) {
   return new RegExp(`${newSegment}`);
 }
 
-function extractData(string, segment) {
+function extractData(rawFragment, segment) {
   const tokens = segment.tokens;
-  let searchString = string;
-  const tokenKeys = (segment.fragment.match(TOKEN_REGEX) || []).map(stripOuterBraces);
+  let searchString = rawFragment;
+  const tokenKeys = util.keys(tokens);
   const tokenData = tokenKeys.reduce((data, tokenName) => {
     const matches = searchString.match(tokens[tokenName]);
     const match = util.arrayHead(matches);
-    searchString = string.substr(matches.index + match.length);
+    searchString = searchString.substr(matches.index + match.length);
     data[tokenName] = match;
     return data;
   }, {});
@@ -107,10 +107,10 @@ function routeToList(route, segments) {
     for (let i = leftWall; i < segs.length; i++) {
       const seg = segs[i];
       const regex = regexify(seg);
-      const match = matchString.match(regex);
-      if (match && canPush(seg, list)) {
-        const data = extractData(matchString, seg);
-        matchString = matchString.replace(regex, '');
+      const match = util.arrayHead(matchString.match(regex));
+      if (util.isString(match) && canPush(seg, list)) {
+        const data = extractData(match, seg);
+        matchString = matchString.replace(match, '');
         arraySwap(i, leftWall, segs);
         leftWall += 1;
         finished = false;
@@ -133,6 +133,15 @@ function listToRoute(list, leadingSlash, trailingSlash) {
   }).filter((frag) => frag !== '');
   const hash = fragments.join('/');
   return hash ? `${leadingSlash ? '/' : ''}${hash}${trailingSlash ? '/' : ''}` : hash;
+}
+
+function validateNodesAfter(index, list) {
+  return list.reduce((newList, node, i) => {
+    if (i > index && canPush(node, newList)) {
+      return newList.push(node);
+    }
+    return newList;
+  }, list.slice(0, index + 1));
 }
 
 function chainData(list, upToNode) {
@@ -318,9 +327,12 @@ module.exports = class Marbles {
     win.removeEventListener('hashchange', this.hashChangeHandler);
   }
   // read the given route and fire activate and deactivate accordingly
-  processRoute(hash = this.win.location.hash, replace) {
+  processRoute(hash = this.win.location.hash, replaceHistory) {
     const route = hash.replace('#', '');
     const list = routeToList(route, this.segments);
+    return this.processList(list, replaceHistory);
+  }
+  processList(list, replaceHistory) {
     handleActivations(list, this.list, this.subscribers);
     handleDeactivations(list, this.list, this.subscribers);
     this.list = list;
@@ -330,7 +342,7 @@ module.exports = class Marbles {
       this.options.trailingSlash
     );
     const newHash = `#${newRoute}`;
-    if (replace) {
+    if (replaceHistory) {
       this.win.history.replaceState(util.emptyObject(), '', newHash);
     } else {
       this.win.location.hash = newHash;
@@ -340,29 +352,29 @@ module.exports = class Marbles {
   activate(segmentId, data) {
     const list = this.list;
     const seg = this.segments.find(({ id }) => id === segmentId);
-    const segNode = setTokenData(seg, data);
-
-    const newList = list.reduce((l, node) => {
-      const withNode = l.push(node);
-      const withSeg = withNode.push(segNode);
-      const ok = seg.rule(segmentId, withSeg);
-      return ok ? withSeg : withNode;
-    }, List());
-    const route = listToRoute(
-      newList,
-      this.options.leadingSlash,
-      this.options.trailingSlash
-    );
-    return this.processRoute(route);
+    const segmentWithData = setTokenData(seg, data);
+    const foundIndex = list.findIndex(({ id }) => id === segmentId);
+    let newList = list;
+    let insertionIndex = 0;
+    if (foundIndex !== -1) {
+      newList = newList.set(foundIndex, segmentWithData);
+    } else {
+      for (insertionIndex; insertionIndex <= list.size; insertionIndex++) {
+        if (canPush(segmentWithData, newList.slice(0, insertionIndex))) {
+          newList = newList.insert(insertionIndex, segmentWithData);
+          break;
+        }
+      }
+    }
+    return this.processList(validateNodesAfter(insertionIndex, newList));
   }
   deactivate(segmentId) {
     const removalIndex = this.list.findLastIndex((node) => node.id === segmentId);
-    const newRoute = listToRoute(
-      this.list.delete(removalIndex),
-      this.options.leadingSlash,
-      this.options.trailingSlash
-    );
-    return this.processRoute(newRoute);
+    let list = this.list;
+    if (removalIndex !== -1) {
+      list = this.list.delete(removalIndex);
+    }
+    return this.processList(list);
   }
   subscribe(subscription) {
     assertValidSubscription(subscription);

@@ -124,7 +124,6 @@
         show(document.getElementById(`details-${data.messageId}`));
       },
       deactivated: () => {
-        hide(messagesInbox);
         hide(messagesDetail);
       }
     }

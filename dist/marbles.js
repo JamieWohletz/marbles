@@ -113,7 +113,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var nodeIndex = list.findLastIndex(function (node) {
 	      return node.id === segmentId;
 	    });
-	    return nodeIndex === parentIndex + 1;
+	    return parentIndex !== -1 && nodeIndex === parentIndex + 1;
 	  };
 	}
 	
@@ -138,14 +138,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	  return new RegExp('' + newSegment);
 	}
 	
-	function extractData(string, segment) {
+	function extractData(rawFragment, segment) {
 	  var tokens = segment.tokens;
-	  var searchString = string;
-	  var tokenKeys = (segment.fragment.match(TOKEN_REGEX) || []).map(stripOuterBraces);
+	  var searchString = rawFragment;
+	  var tokenKeys = util.keys(tokens);
 	  var tokenData = tokenKeys.reduce(function (data, tokenName) {
 	    var matches = searchString.match(tokens[tokenName]);
 	    var match = util.arrayHead(matches);
-	    searchString = string.substr(matches.index + match.length);
+	    searchString = searchString.substr(matches.index + match.length);
 	    data[tokenName] = match;
 	    return data;
 	  }, {});
@@ -172,10 +172,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    for (var i = leftWall; i < segs.length; i++) {
 	      var seg = segs[i];
 	      var regex = regexify(seg);
-	      var match = matchString.match(regex);
-	      if (match && canPush(seg, list)) {
-	        var data = extractData(matchString, seg);
-	        matchString = matchString.replace(regex, '');
+	      var match = util.arrayHead(matchString.match(regex));
+	      if (util.isString(match) && canPush(seg, list)) {
+	        var data = extractData(match, seg);
+	        matchString = matchString.replace(match, '');
 	        arraySwap(i, leftWall, segs);
 	        leftWall += 1;
 	        finished = false;
@@ -202,6 +202,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	  });
 	  var hash = fragments.join('/');
 	  return hash ? '' + (leadingSlash ? '/' : '') + hash + (trailingSlash ? '/' : '') : hash;
+	}
+	
+	function validateNodesAfter(index, list) {
+	  return list.reduce(function (newList, node, i) {
+	    if (i > index && canPush(node, newList)) {
+	      return newList.push(node);
+	    }
+	    return newList;
+	  }, list.slice(0, index + 1));
 	}
 	
 	function chainData(list, upToNode) {
@@ -359,16 +368,21 @@ return /******/ (function(modules) { // webpackBootstrap
 	    key: 'processRoute',
 	    value: function processRoute() {
 	      var hash = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.win.location.hash;
-	      var replace = arguments[1];
+	      var replaceHistory = arguments[1];
 	
 	      var route = hash.replace('#', '');
 	      var list = routeToList(route, this.segments);
+	      return this.processList(list, replaceHistory);
+	    }
+	  }, {
+	    key: 'processList',
+	    value: function processList(list, replaceHistory) {
 	      handleActivations(list, this.list, this.subscribers);
 	      handleDeactivations(list, this.list, this.subscribers);
 	      this.list = list;
 	      var newRoute = listToRoute(this.list, this.options.leadingSlash, this.options.trailingSlash);
 	      var newHash = '#' + newRoute;
-	      if (replace) {
+	      if (replaceHistory) {
 	        this.win.history.replaceState(util.emptyObject(), '', newHash);
 	      } else {
 	        this.win.location.hash = newHash;
@@ -383,16 +397,24 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var id = _ref3.id;
 	        return id === segmentId;
 	      });
-	      var segNode = setTokenData(seg, data);
-	
-	      var newList = list.reduce(function (l, node) {
-	        var withNode = l.push(node);
-	        var withSeg = withNode.push(segNode);
-	        var ok = seg.rule(segmentId, withSeg);
-	        return ok ? withSeg : withNode;
-	      }, (0, _immutable.List)());
-	      var route = listToRoute(newList, this.options.leadingSlash, this.options.trailingSlash);
-	      return this.processRoute(route);
+	      var segmentWithData = setTokenData(seg, data);
+	      var foundIndex = list.findIndex(function (_ref4) {
+	        var id = _ref4.id;
+	        return id === segmentId;
+	      });
+	      var newList = list;
+	      var insertionIndex = 0;
+	      if (foundIndex !== -1) {
+	        newList = newList.set(foundIndex, segmentWithData);
+	      } else {
+	        for (insertionIndex; insertionIndex <= list.size; insertionIndex++) {
+	          if (canPush(segmentWithData, newList.slice(0, insertionIndex))) {
+	            newList = newList.insert(insertionIndex, segmentWithData);
+	            break;
+	          }
+	        }
+	      }
+	      return this.processList(validateNodesAfter(insertionIndex, newList));
 	    }
 	  }, {
 	    key: 'deactivate',
@@ -400,8 +422,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	      var removalIndex = this.list.findLastIndex(function (node) {
 	        return node.id === segmentId;
 	      });
-	      var newRoute = listToRoute(this.list.delete(removalIndex), this.options.leadingSlash, this.options.trailingSlash);
-	      return this.processRoute(newRoute);
+	      var list = this.list;
+	      if (removalIndex !== -1) {
+	        list = this.list.delete(removalIndex);
+	      }
+	      return this.processList(list);
 	    }
 	  }, {
 	    key: 'subscribe',

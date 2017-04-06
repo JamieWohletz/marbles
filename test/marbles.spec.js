@@ -60,7 +60,7 @@ describe('Marbles', () => {
           id: 'about',
           segment: {}
         });
-        assert.isFalse(Marbles.rules.childOf('root')('about', withAbout));
+        assert.isFalse(Marbles.rules.childOf('nada')('about', withAbout));
       });
     });
   });
@@ -438,6 +438,28 @@ describe('Marbles', () => {
         m.processRoute('');
         assert.equal(m.activate('home', {}), '');
       });
+      it('forces new segments to override old segments, despite rule definition order', () => {
+        const m = new Marbles([
+          {
+            id: 'home',
+            fragment: 'home',
+            rule: Marbles.rules.childOf('root')
+          },
+          {
+            id: 'about',
+            fragment: 'about',
+            rule: Marbles.rules.childOf('root')
+          },
+          {
+            id: 'anything',
+            fragment: 'anything',
+            rule: Marbles.rules.or(Marbles.rules.childOf('about'), Marbles.rules.childOf('home'))
+          }
+        ], {}, win);
+        m.activate('home');
+        assert.equal(m.activate('anything'), '/home/anything/');
+        assert.equal(m.activate('about'), '/about/anything/');
+      });
       it('should use the data provided', () => {
         const m = new Marbles([
           {
@@ -452,6 +474,62 @@ describe('Marbles', () => {
         m.processRoute('');
         assert.equal(m.activate('user', { userId: 1 }), '/users/1/');
       });
+      it('should insert the data in the correct segment', () => {
+        const m = new Marbles([
+          {
+            id: 'user',
+            fragment: 'users/{userId}',
+            rule: Marbles.rules.childOf('root'),
+            tokens: {
+              userId: Marbles.Regex.DIGITS
+            }
+          },
+          {
+            id: 'car',
+            fragment: 'cars/{carId}',
+            rule: Marbles.rules.present('root'),
+            tokens: {
+              carId: Marbles.Regex.DIGITS
+            }
+          }
+        ], {}, win);
+        m.processRoute('users/1/cars/3');
+        assert.equal(m.activate('car', { carId: 5 }), '/users/1/cars/5/');
+        assert.equal(m.activate('user', { userId: 3 }), '/users/3/cars/5/');
+      });
+      it('should affect only the segment being activated', () => {
+        const m = new Marbles([
+          {
+            id: 'user',
+            fragment: 'users/{userId}',
+            rule: Marbles.rules.childOf('root'),
+            tokens: {
+              userId: Marbles.Regex.DIGITS
+            }
+          },
+          {
+            id: 'car',
+            fragment: 'cars/{carId}',
+            rule: Marbles.rules.childOf('user'),
+            tokens: {
+              carId: Marbles.Regex.DIGITS
+            }
+          },
+          {
+            id: 'tire',
+            fragment: 'tires/{tireId}',
+            rule: Marbles.rules.childOf('car'),
+            tokens: {
+              tireId: Marbles.Regex.DIGITS
+            }
+          }
+        ], {}, win);
+        win.location.hash = 'users/1/cars/3/tires/4';
+        m.start();
+        assert.equal(m.activate('tire', { tireId: 2 }), '/users/1/cars/3/tires/2/');
+        assert.equal(m.activate('car', { carId: 6 }), '/users/1/cars/6/tires/2/');
+        assert.equal(m.activate('user', { userId: 9 }), '/users/9/cars/6/tires/2/');
+      });
     });
   });
   describe('deactivate()', () => {
@@ -465,6 +543,23 @@ describe('Marbles', () => {
       ], {}, win);
       m.processRoute('home');
       assert.equal(m.deactivate('home'), '');
+    });
+    it('should be idempotent', () => {
+      const m = new Marbles([
+        {
+          id: 'home',
+          fragment: 'home',
+          rule: () => true
+        },
+        {
+          id: 'about',
+          fragment: 'about',
+          rule: Marbles.rules.present('root')
+        }
+      ], {}, win);
+      m.processRoute('home/about');
+      assert.equal(m.deactivate('home'), '/about/');
+      assert.equal(m.deactivate('home'), '/about/');
     });
     it('should do nothing for segments that are not present', () => {
       const m = new Marbles([], {}, win);
