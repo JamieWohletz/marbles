@@ -566,6 +566,12 @@ describe('Marbles', () => {
       assert.equal(m.deactivate('home'), '');
     });
   });
+  describe('subscribe()', () => {
+
+  });
+  describe('unsubscribe()', () => {
+
+  });
   describe('start()', () => {
     it('should listen to window hash change events', (done) => {
       const m = new Marbles([

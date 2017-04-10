@@ -242,7 +242,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  activated.forEach(function (listNode) {
 	    subscribers[listNode.id].activated.forEach(function (handler) {
 	      setTimeout(function () {
-	        handler(chainData(newList, listNode));
+	        handler(chainData(newList));
 	      }, 0);
 	    });
 	  });

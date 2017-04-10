@@ -170,7 +170,7 @@ function handleActivations(newList, oldList, subscribers) {
   activated.forEach((listNode) => {
     subscribers[listNode.id].activated.forEach((handler) => {
       setTimeout(() => {
-        handler(chainData(newList, listNode));
+        handler(chainData(newList));
       }, 0);
     });
   });
