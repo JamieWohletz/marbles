@@ -27,12 +27,12 @@
     {
       id: 'messages-compose',
       fragment: 'compose',
-      rule: Marbles.rules.present('messages')
+      rule: Marbles.rules.descendsFrom('messages')
     },
     {
       id: 'messages-inbox',
       fragment: 'inbox',
-      rule: Marbles.rules.present('messages')
+      rule: Marbles.rules.descendsFrom('messages')
     },
     {
       id: 'messages-detail',

@@ -117,11 +117,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	  };
 	}
 	
-	function present(requiredSegmentId) {
+	function descendsFrom(ancestorId) {
 	  return function (segmentId, list) {
-	    return list.findIndex(function (node) {
-	      return node.id === requiredSegmentId;
-	    }) !== -1;
+	    var ancestorIndex = list.findLastIndex(function (node) {
+	      return node.id === ancestorId;
+	    });
+	    var nodeIndex = list.findLastIndex(function (node) {
+	      return node.id === segmentId;
+	    });
+	    return ancestorIndex !== -1 && nodeIndex > ancestorIndex;
 	  };
 	}
 	
@@ -354,6 +358,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        _this.processRoute(win.location.hash, true);
 	      };
 	      win.addEventListener('hashchange', this.hashChangeHandler);
+	      return this;
 	    }
 	  }, {
 	    key: 'stop',
@@ -361,6 +366,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      var win = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this.win;
 	
 	      win.removeEventListener('hashchange', this.hashChangeHandler);
+	      return this;
 	    }
 	    // read the given route and fire activate and deactivate accordingly
 	
@@ -461,7 +467,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    key: 'rules',
 	    get: function get() {
 	      return util.assign({
-	        present: present,
+	        descendsFrom: descendsFrom,
 	        childOf: childOf
 	      }, logic);
 	    }

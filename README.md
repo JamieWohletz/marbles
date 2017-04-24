@@ -8,12 +8,14 @@ Client-side hierarchical routing library supporting optional views.
 
 ## Overview
 
-Marbles is a **flexible**, **framework-agnostic**, **client-side** routing library.
+Marbles is a **flexible**, **framework-agnostic**, **client-side**, ***rule-based*** routing library.
 
 Features:
 * Event-driven interface
-* Optional route segments/fragments
-* Hierarchical routes
+* Optional route segments
+* Rule-based segment configuration
+
+If you want to see a (vanilla js) demo, please look in the demo directory of this repository.
 
 ## Why Another Routing Library?
 
@@ -24,7 +26,7 @@ Well, why do people usually reinvent the wheel?
 1. To learn
 2. Because the wheel doesn't do something they need
 
-While learning was a nice side effect of having done this project, my main reason was that I couldn't find any routers that did what I _needed_. Granted, I didn't read the docs for all 13,771 (as of this writing) other routers, but I read the docs for some of the top ones and couldn't find what I needed.
+While learning was a nice side effect of having done this project, the main reason was that I couldn't find any routers that did what I _needed_. Granted, I didn't read the docs for all 13,771 (as of this writing) other routers, but I read the docs for some of the top ones and couldn't find what I needed.
 
 What did I need?
 
@@ -76,136 +78,134 @@ Download the [minified](https://github.com/JamieWohletz/marbles/blob/master/dist
 Then, in your code, create the router and set it up like this:
 
 ```
-var Marbles = marbles.default; 
-var router = new Marbles({
+const router = new Marbles([
   // segment definitions -- see below
-});
-// The hashchange event doesn't fire on window load. Calling `step()` forces the hash route to be evaluated by Marbles.
-router.step();
-// Listen for hashchange events.
+]);
+// Listen for hashchange events and fire event listeners for the current route.
 router.start();
 ```
 
 ### Specifying segments
 
-You specify segments as an [adjacency list](https://en.wikipedia.org/wiki/Adjacency_list).
+*Segments* are the fundamental building blocks for
+routes in Marbles. A segment can be anything from `home` to `users/{userId}` to `company/about/contact-us`. 
+
+In Marbles, routes are constructed out of segments. 
+Marbles determines if a segment can be added to the 
+route at any given time based on the segment's *rule*. This is the *rule-based* part of Marbles.
+
+Without further ado, a segment configuration example.
 
 #### Example
 ```
-var segments = {
-  // 'root' is REQUIRED
-  'root': {
-    // and it should always be active
-    active: true,
-    // root has no segment (though it can, if you want it to!)
-    segment: '',
-    // 'root' is strong and independent, like Katy Perry
-    dependency: '',
-    // This is an XOR'd list of children.
-    // That means that root can be followed by 'home' XOR 'about' XOR 'blog'
-    children: ['home', 'about', 'blog'],
-    data: {}
-  },
-  'home': {
-    // when loading the page without a hashroute, it will automatically direct to '#home' because this is active and root is active.
-    active: true,
+var segments = [
+  {
+    id: 'home',
     // do not include leading or trailing slashes
-    segment: 'home',
-    // can't build a home without setting down ROOTS!
-    dependency: 'root',
-    children: [],
-    data: {}
+    fragment: 'home',
+    // 'root' is a special segment added by Marbles.
+    // It exists before all other segments in the route.
+    rule: Marbles.rules.childOf('root')
   },
-  'about': {
-    active: false,
-    segment: 'about',
-    dependency: 'root',
-    children: [
-      'founder'
-    ],
-    data: {}
+  {
+    id: 'about',
+    fragment: 'about',
+    // This has the same rule as 'home'! 
+    // Fortunately, Marbles is smart enough to 
+    // figure out that only one such segment is allowed. 
+    // That's where the array ordering comes in.
+    // Given a route /home/about/, Marbles will
+    // remove 'about' because it comes AFTER
+    // home in this configuration array.
+    // However, there is special behavior when
+    // activating segments (see below).
+    rule: Marbles.rules.childOf('root')
   },
-  'blog': {
-    active: false,
-    segment: 'about',
-    dependency: 'root',
-    children: [],
-    data: {}
+  {
+    id: 'blog',
+    fragment: 'blog',
+    rule: Marbles.rules.childOf('root')
   },
-  'founder': {
-    active: false,
-    segment: 'our-founder',
-    dependency: 'about',
-    children: ['employees'],
-    data: {}
+  {
+    id: 'founder',
+    fragment: 'our-founder',
+    // Notice that you can pass any segment ID to
+    // Marbles.rules.childOf()
+    rule: Marbles.rules.childOf('about')
   },
-  'employees': {
-    active: false,
-    segment: 'employees',
-    // Specifying 'about' as the dependency means that we can remove 'founder' and 'employees' will still stick around, as long as 'about' is present in the route.
-    // That means that 'founder' is an optional segment! Notice that since 'employees' is a child of 'founder', if 'founder' is present, it will _always_ come before 'employees'.
-    dependency: 'about',
-    children: [],
-    data: {}
+  {
+    id: 'employees',
+    fragment: 'employees',
+    // Oh! Interesting. Here we say that
+    // employees can show up anytime in the route
+    // after 'about'. That means it could come
+    // after 'founder' or directly after 'about'.
+    // Therefore, founder is an optional segment
+    // from this segment's point of view.
+    rule: Marbles.rules.present('about')
   }
 };
 ```
 
-The keys are **IDs**, and the nested objects are **segment configs**. That is, in example above, 'home' is the ID of a segment, and its config is 
+Notice how segments are configured as an array. This is important. *The array is ordered by segment weight, from lowest to highest*. What that means is that if you have two segments with conflicting rules and Marbles is trying to parse a route with both segments in it, Marbles will choose the segment that appears earlier in the array.
+
+In general, a single segment config object looks like this:
 
 ```
 {
-  active: true,
-  segment: 'home',
-  dependency: 'root',
-  children: []
-}
-```
-
-#### Segments
-
-Segments consist of a configuration object and an ID. In the route configuration, you specify the ID as a string key, and the configuration object as an object value mapped to a key.
-
-**You may specify the following options on segment configs**:
-
-```
-{
-  // (Required) Whether this segment is active initially. 
-  active: <Boolean>
-  // (Required) The actual segment to place in the hash route. Omit leading and trailing slashes.
-  segment: <String>
-  // (Required) Specifies what segment this segment must descend from.
-  dependency: <String>,
-  // (Required) A list of segment IDs that are direct descendants of this segment. These children are XOR'd, meaning only one child may be present in the hash route at a time. In tree terminology, they are on the same level.
-  children: Array<String>
-  // (Required) An object specifying what data to provide the route. Normally this will be empty, unless you want to hardcode some data.
-  // It is useful for segments with dynamic tokens (more on that below).
-  data: {}
-}
-```
-
-#### Dynamic Tokens
-
-Segments may specify _dynamic tokens_ in their segment strings. Example:
-
-```
-{
-  active: false,
-  // `:userId` is a dynamic token.
-  segment: 'users/:userId'
-  dependency: 'root',
-  children: [],
-  // the `data` object can be used
-  // to provide default values
-  data: {
-    userId: 1
+  id: string,
+  fragment: string,
+  rule: (segmentId: string, routeList: List): Boolean,
+  tokens?: {
+    [tokenName]: RegExp
   }
 }
 ```
 
-Notice the use of the `data` object. You would almost never do this, so it's a contrived example. Instead, you set the data by using the `insert()` method. See the API section for details.
+#### Rules
 
-**Warning: There is a BUG (🐛) that prevents multiple dynamic tokens in a single segment from working correctly.** This is being worked on. 
+The most important part of any segment's definition is its _rule_. A rule is simply a function that accepts a couple parameters and returns a boolean. Here's the function signature:
+
+`(segmentId: string, routeList: List) : Boolean`
+
+* `segmentId` is the ID of the segment whose rule is being evaluated. For example, in this configuration, the segmentId would be 'home':
+```
+{
+  id: 'home',
+  rule: (segmentId) => true,
+  fragment: 'home'
+}
+```
+* `routeList` is an [Immutable List](https://facebook.github.io/immutable-js/docs/#/List) representing a *portion* of the route _that includes the current segment_. Note that this portion may actually be the whole route.
+
+Rule functions should analyze the List provided and return whether it is valid, i.e., whether the current segment can exist on the end of the given List.
+
+It is important to note that rules should never look _ahead_ in the route, only behind.
+
+Marbles comes with some useful built-in rules to make your job easier. These are the following:
+
+* `Marbles.rules.childOf(segmentId: string)` - requires that the current segment be a direct child of the segment identified by `segmentId`
+* `Marbles.rules.descendsFrom(segmentId: string)` - requires that the current segment be a _descendent_ of the segment identified by `segmentId`.
+
+#### Dynamic Tokens
+
+Segments may specify _dynamic tokens_ in their fragment strings. Example:
+
+```
+{
+  id: 'user',
+  // `:userId` is a dynamic token.
+  fragment: 'users/{userId}',
+  rule: () => true,
+  // The `tokens` object is required 
+  // when a dynamic token is present.
+  // Every dynamic token must be configured
+  // with a regex that will match it.
+  tokens: {
+    userId: Marbles.Regex.DIGITS
+  }
+}
+```
 
 ## API
 
@@ -219,37 +219,37 @@ This method can be used to subscribe to events. It returns true if the subscript
 
 ```
 {
-  <segment_id>: {
-    inserted: function(data) {
+  [segment_id]: {
+    activated: function(data) {
       // do something
     },
-    removed: function() {
+    deactivated: function() {
       // do something
     }
   }
 }
 ```
 
-Both the `inserted` and `removed` keys are optional, though you should provide at least one for every segment to which you are subscribing (otherwise what's the point?). 
+Both the `activated` and `deactivated` keys are optional, though you should provide at least one for every segment to which you are subscribing (otherwise what's the point?). 
 
-The function registered under `inserted` is fired every time the segment under watch is inserted. It is passed a `data` object, which is a key-value map of all dynamic token data stored in the route _up to that segment_. 
+The function registered under `activated` is fired every time the segment under watch is activated either with Marbles.activate or by adding it to the URL. It is passed a `data` object, which is a key-value map of all dynamic token data stored in the route.
 
-The function registered under `removed` is fired every time the segment under watch is removed. It is not passed anything.
+The function registered under `deactivated` is fired every time the segment under watch is deactivated, either by Marbles.deactivate or by removing the segment from the URL. It is not passed anything.
 
 **Example**:
 
 ```
 m.subscribe({
   'user': {
-    // fired on .insert('user', ...) calls
-    inserted: function(data) {
+    // fired on .activate('user', ...) calls
+    activated: function(data) {
       console.log('Route for user #' + data.userId + ' activated!');
       // note that data will have any other
       // dynamic tokens from segments preceeding 'user' as well
       someView.show();
     },
-    // fired on .remove('user') calls
-    removed: function() {
+    // fired on .deactivate('user') calls
+    deactivated: function() {
       console.log('User route deactivated.');
       someView.hide();
     }
@@ -257,12 +257,10 @@ m.subscribe({
 });
 ```
 
-### unsubscribe(segmentId, event, handler): Boolean|Array
+### unsubscribe(subscriptions): Boolean|Array
 
 Use this method to remove subscriptions. The parameters are as follows:
-* segmentId - ID of the segment whose listener you want to remove
-* event - Name of event whose listener want you to remove. Can be either 'inserted' or 'removed'.
-* handler - The handler function you provided in your `subscribe()` config.
+* subscriptions - The subscription config used when `.subscribe` was called.
 
 This method will return false if removal was unsuccessful (for example, if a bad parameter is passed), otherwise it will return an array of removed listeners.
 
@@ -272,45 +270,37 @@ This method will return false if removal was unsuccessful (for example, if a bad
 const handler = function doSomething(data) {
   ...
 };
-// first, subscribe to an event
-m.subscribe({
+const subscription = {
   'home': {
-    inserted: handler
+    activated: handler
   }
-});
+};
+// first, subscribe to an event
+m.subscribe(subscription);
 // unsubscribe!
-m.unsubscribe('home', 'inserted', handler);
+m.unsubscribe(subscription);
 ```
 
-### step()
+### processRoute(hash: string): string
 
-**This method is chainable.**
+This method accepts a hash route (e.g., `/users/1` or `#home/about-us`) and returns a new, transformed route. The transformation applied is based on the configured segments. 
 
-`step()` takes a snapshot of the current `window.location.hash` and fires any listeners that have been registered with `subscribe()`. The snapshot is recorded and is used as the previous state the next time `step()` is called. Note that internally, `start()` simply calls `step()` every time the `hashchange` event fires.
+**Example**:
 
-Normally, you don't want to call `step()` directly, BUT you should **always call it once after router instantiation**. Why? So you can fire listeners for the initial state of the hash route, which isn't captured by `start()` because `hashchange` doesn't fire on page load.
-
-**Examples**:
-
-* On router instantiation:
-    
-    ```
-    const m = new Marbles(...);
-    m.subscribe(...); // add listeners
-    m.step(); // fire listeners for initial hash route.
-    m.start(); // listen for further hashchange events.
-    ```
-
-* Assume `window.location.hash` = `users/1/profile/details`, and also that there are listeners for every segment in the given hash. 
-
-    `step(); // fires listeners` 
-
+```
+// configure router with segments
+const m = new Marbles({...});
+// then you may call processRoute()
+m.processRoute('/home/about-us');
+```
 
 ### start()
 
 **This method is chainable.**
 
-Listens for `hashchange` events and fires listeners added using `subscribe()` on said events. Unless you need fine-grained control of when your event listeners fire, you should always call this method when setting up Marbles, AFTER a single call to `step()`. 
+Listens for `hashchange` events and fires listeners added using `subscribe()` on said events. Unless you need fine-grained control of when your event listeners fire, you should always call this method when setting up Marbles. 
+
+*Note*: This method will also fire `activated` and `deactivated` events for all subscribers based on the current window hash route when called.
 
 **Example**:
 
@@ -320,18 +310,19 @@ const m = new Marbles(...);
 // set up some listeners
 m.subscribe({
   'home': {
-    inserted: () => {
+    activated: () => {
       console.log('Honey, I\'m home!');
+    },
+    deactivated: () => {
+      console.log('Hold my calls, I\'m going out!');
     }
   }
 });
-// assume window.location.hash = ''
-// call step() to handle initial hashroute.
-m.step();
-// finally, call start() to listen for hashchange events.
+// assume window.location.hash === '#home'
 m.start();
-// assume window.location.hash changes to 'home'
-// "Honey, I'm home!"
+// => Honey, I'm home!
+// user clicks a link that redirects to some other route
+// => Hold my calls, I'm going out!
 ```
 
 ### stop()
@@ -344,14 +335,57 @@ Stop Marbles from listening to `hashchange` events.
 
 `m.stop();`
 
-### insert(segmentId[, data])
+### activate(segmentId: string [, data: Object]): string
 
-**This method is chainable.**
+When `activate()` is called, Marbles attempts to insert the given segment with the provided data at the _leftmost possible position_ into the hash route. Whether this is successful depends on the segment's rule. 
 
-When `insert()` is called, Marbles attempts to insert the given segment with the provided data into the hash route. Whether this is successful depends on the route configuration. 
+It is very important to understand how this mechanism works, so I will expand on it here.
 
-**NOTE**: `insert()` only updates the hashroute.
-To ensure your listeners are fired, use `step()` or `start()`.
+Suppose window.location.hash currently equals `/users/1/profile` and you've configured your Marbles instance with the following segments:
+
+```
+[
+  {
+    id: 'user',
+    fragment: 'users/{userId}',
+    rule: Marbles.rules.childOf('root'),
+    tokens: {
+      userId: Marbles.Regex.DIGITS
+    }
+  },
+  {
+    id: 'profile',
+    fragment: 'profile',
+    rule: Marbles.rules.present('user')
+  },
+  {
+    id: 'messages',
+    fragment: 'messages',
+    rule: Marbles.rules.present('user')
+  }
+]
+```
+
+Notice how `profile` and `messages` have the same rule. Let's activate `messages`:
+
+`m.activate('messages');`
+
+Now Marbles has to figure out where to put the `messages` fragment in the route. The steps below detail how it does this.
+
+`m.list` looks like | root | user | profile |.
+1. Attempt to insert `messages` into the 1st position in the list (after root and before user). Is this a valid position for `messages`? No, according to its rule.
+2. Attempt to insert `messages` into the 2nd position in the list (after user and before profile). Is this a valid position for `messages`? Yes, according to its rule. Now the list looks like this: | root | user | messages | profile |.
+3. Are the nodes after `messages` still valid, or should they be removed? Left-to-right traverse List at i > List.indexOf(messages), evaluating rules and removing segments accordingly. 
+4. Final list is | root | user | messages | profile |.
+
+As you can see, Marbles will place the segment in the lowest index possible and remove any invalid segments that come after that.
+
+*Parameters*: 
+* segmentId - The segment to activate
+* data - A key-value map of data to include. For example, if activating the `user` segment, one might pass a data object that looks like `{ userId: 1 }`.
+
+*Return value*:
+A transformed hash route that may include the activated segment, if allowed by its rule.
 
 **Examples**: 
 
@@ -363,21 +397,25 @@ To ensure your listeners are fired, use `step()` or `start()`.
     
     `m.insert('user', { userId: 1 });`
 
-### remove(segmentId)
+### deactivate(segmentId: string): string
 
-**This method is chainable.**
+This method removes a segment from the hash route.
 
-This method removes a segment from the hash route. This will update `window.location.hash` but will NOT fire any listeners by default. To fire the listeners, ensure you've already called `start()`, or call `step()` immediately after calling `remove()`.
+*Parameters*: 
+* segmentId - The segment to remove (if present)
+
+*Return value*:
+A transformed hash route that no longer includes the segment identified by `segmentId`.
 
 **Examples**: 
 
 * Remove the 'home' segment:
 
-    `m.remove('home');`
+    `m.deactivate('home');`
 
-* Remove the `user` segment. Notice that no data needs to be passed when _removing_ a segment.
+* Remove the `user` segment. Notice that no data needs to be passed when _deactivating_ a segment.
 
-    `m.remove('user');
+    `m.deactivate('user');
 
 ### getData(): data
 
@@ -385,39 +423,27 @@ Call this method to retrieve all the data from the dynamic tokens in the active 
 
 **Example**:
 
-Assume the hashroute is `users/1/cars/2/details` and Marbles is configured with the following segment definitions:
+Assume the hashroute is `users/1/cars/2` and Marbles is configured with the following segment definitions:
 
 ```
-{
-  'root': {
-    active: true,
-    children: ['user'],    
-    data: {},
-    dependency: '',
-    segment: ''
+[
+  {
+    id: 'user',
+    fragment: 'users/{userId}',
+    rule: Marbles.rules.childOf('root'),
+    tokens: {
+      userId: Marbles.Regex.DIGITS
+    }
   },
-  'user': {
-    active: false,
-    children: ['car'],
-    data: {},
-    dependency: 'root',
-    segment: 'users/:userId'
-  },
-  'car': {
-    active: false,
-    children: ['car-details'],
-    data: {},
-    dependency: 'user',
-    segment: 'cars/:carId'
-  },
-  'car-details': {
-    active: false,
-    children: [],
-    data: {},
-    dependency: 'car',
-    segment: 'details'
+  {
+    id: 'car',
+    fragment: 'cars/{carId}',
+    rule: Marbles.rules.childOf('user'),
+    tokens: {
+      carId: Marbles.Regex.DIGITS
+    }
   }
-}
+]
 ```
 
 `m.getData(); // ->`

@@ -45,11 +45,15 @@ function childOf(parentId) {
   };
 }
 
-function present(requiredSegmentId) {
+function descendsFrom(ancestorId) {
   return (segmentId, list) => {
-    return list.findIndex((node) => {
-      return node.id === requiredSegmentId;
-    }) !== -1;
+    const ancestorIndex = list.findLastIndex((node) => {
+      return node.id === ancestorId;
+    });
+    const nodeIndex = list.findLastIndex((node) => {
+      return node.id === segmentId;
+    });
+    return ancestorIndex !== -1 && nodeIndex > ancestorIndex;
   };
 }
 
@@ -307,7 +311,7 @@ module.exports = class Marbles {
   }
   static get rules() {
     return util.assign({
-      present,
+      descendsFrom,
       childOf
     }, logic);
   }
@@ -322,9 +326,11 @@ module.exports = class Marbles {
       this.processRoute(win.location.hash, true);
     };
     win.addEventListener('hashchange', this.hashChangeHandler);
+    return this;
   }
   stop(win = this.win) {
     win.removeEventListener('hashchange', this.hashChangeHandler);
+    return this;
   }
   // read the given route and fire activate and deactivate accordingly
   processRoute(hash = this.win.location.hash, replaceHistory) {

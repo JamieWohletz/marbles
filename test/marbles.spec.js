@@ -20,15 +20,15 @@ describe('Marbles', () => {
     it('is visible as a static property', () => {
       assert.isObject(Marbles.rules);
     });
-    it('exposes logic.or, logic.not, logic.and, and present and childOf', () => {
+    it('exposes logic.or, logic.not, logic.and, and descendsFrom and childOf', () => {
       assert.property(Marbles.rules, 'or');
       assert.property(Marbles.rules, 'not');
       assert.property(Marbles.rules, 'and');
       assert.property(Marbles.rules, 'childOf');
-      assert.property(Marbles.rules, 'present');
+      assert.property(Marbles.rules, 'descendsFrom');
     });
-    describe('present()', () => {
-      it('should check if a segment is present in a linked list', () => {
+    describe('descendsFrom()', () => {
+      it('should check if a segment is an ancestor of another in a linked list', () => {
         const list = List([
           {
             id: 'root',
@@ -37,10 +37,14 @@ describe('Marbles', () => {
           {
             id: 'home',
             segment: {}
+          },
+          {
+            id: 'child',
+            segment: {}
           }
         ]);
-        assert.isTrue(Marbles.rules.present('home')('', list));
-        assert.isFalse(Marbles.rules.present('about')('', list));
+        assert.isTrue(Marbles.rules.descendsFrom('home')('child', list));
+        assert.isFalse(Marbles.rules.descendsFrom('about')('child', list));
       });
     });
     describe('childOf()', () => {
@@ -416,7 +420,7 @@ describe('Marbles', () => {
           {
             id: 'about',
             fragment: 'about',
-            rule: Marbles.rules.and(Marbles.rules.present('root'), Marbles.rules.childOf('home'))
+            rule: Marbles.rules.and(Marbles.rules.descendsFrom('root'), Marbles.rules.childOf('home'))
           },
           {
             id: 'home',
@@ -487,7 +491,7 @@ describe('Marbles', () => {
           {
             id: 'car',
             fragment: 'cars/{carId}',
-            rule: Marbles.rules.present('root'),
+            rule: Marbles.rules.descendsFrom('root'),
             tokens: {
               carId: Marbles.Regex.DIGITS
             }
@@ -554,7 +558,7 @@ describe('Marbles', () => {
         {
           id: 'about',
           fragment: 'about',
-          rule: Marbles.rules.present('root')
+          rule: Marbles.rules.descendsFrom('root')
         }
       ], {}, win);
       m.processRoute('home/about');
