@@ -142,7 +142,7 @@ var segments = [
     // after 'founder' or directly after 'about'.
     // Therefore, founder is an optional segment
     // from this segment's point of view.
-    rule: Marbles.rules.present('about')
+    rule: Marbles.rules.descendsFrom('about')
   }
 };
 ```
@@ -356,12 +356,12 @@ Suppose window.location.hash currently equals `/users/1/profile` and you've conf
   {
     id: 'profile',
     fragment: 'profile',
-    rule: Marbles.rules.present('user')
+    rule: Marbles.rules.descendsFrom('user')
   },
   {
     id: 'messages',
     fragment: 'messages',
-    rule: Marbles.rules.present('user')
+    rule: Marbles.rules.descendsFrom('user')
   }
 ]
 ```
